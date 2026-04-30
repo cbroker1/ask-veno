@@ -43,6 +43,8 @@ CREATE TABLE IF NOT EXISTS videos (
     local_dir TEXT,
     audio_path TEXT,
     transcript_path TEXT,
+    clean_transcript_status TEXT NOT NULL DEFAULT 'not_started',
+    clean_transcript_path TEXT,
     chroma_collection TEXT,
 
     attempt_count INTEGER NOT NULL DEFAULT 0,
