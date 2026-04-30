@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Secrets
+.env
+.env.*
+!.env.example
+cookies.txt
+*.cookies
+
+# Local workflow state
+.state/
+*.sqlite
+*.sqlite3
+*.db
+*.sqlite-journal
+
+# Local/private data
+data/raw/
+data/private/
+data/chroma/
+
+# Logs/reports that may contain local paths or errors
+logs/
+*.log
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
