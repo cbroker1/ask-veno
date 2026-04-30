@@ -1,55 +1,171 @@
 # Hermes Self-Healing YouTube RAG Agent
 
-A local-first YouTube ingestion and RAG pipeline designed to eventually run under Hermes Agent.
+A local-first YouTube ingestion and RAG pipeline designed to become a self-healing agent workflow with Hermes Agent.
 
-The goal is to demonstrate a self-healing agent workflow:
+This project started as a set of Jupyter notebooks and was refactored into a stateful, queue-driven Python pipeline.
 
-1. Discover videos from a YouTube channel.
-2. Filter videos by title substring.
-3. Persist discovered videos in SQLite.
-4. Process only new, queued, or explicitly retried videos.
-5. Safely handle common yt-dlp failures such as stale cookies, auth errors, missing subtitles, and transient network issues.
-6. Extract transcripts.
-7. Chunk and embed transcripts into ChromaDB.
-8. Let Hermes Agent diagnose failures, learn repair procedures, and reuse them in future runs.
+## Current MVP
 
-## MVP Scope
+The current pipeline can:
 
-The first version focuses on building a deterministic ingestion pipeline before adding Hermes.
+1. Discover YouTube videos from a channel using title filters.
+2. Store candidate videos in SQLite.
+3. Download audio only with `yt-dlp`.
+4. Transcribe audio with Whisper on CUDA.
+5. Clean Whisper transcripts into simplified timestamped segments.
+6. Chunk and embed transcripts into ChromaDB.
+7. Query ChromaDB and send retrieved context to Ollama.
+8. Run one pipeline pass with a single command.
 
-Core components:
-
-- `yt-dlp` for YouTube discovery and transcript extraction
-- SQLite for ingestion state
-- ChromaDB for vector storage
-- Python scripts for discovery, processing, and embedding
-- Local Ollama/Qwen helper for architecture and code review
-- Hermes Agent integration later
-
-## Safety Notes
-
-This repo should never contain:
-
-- `.env`
-- `cookies.txt`
-- browser cookie exports
-- Chrome profile files
-- API keys
-- tokens
-- private transcripts
-- raw downloaded media
-- local vector database files
-
-## Planned Workflow
+## Pipeline
 
 ```text
-Channel URL
-  → lightweight yt-dlp discovery
-  → title substring filter
-  → SQLite video registry
-  → process only new/queued videos
-  → transcript extraction
-  → chunking
+YouTube channel
+  → discover matching videos
+  → SQLite registry
+  → download queued audio
+  → Whisper transcription
+  → transcript cleanup
   → ChromaDB embedding
-  → run report
-  → Hermes learns repair procedures
+  → Ollama inference
+```
+
+## Main scripts
+
+```text
+scripts/init_db.py
+scripts/migrate_db.py
+scripts/discover_audio_candidates.py
+scripts/process_audio_queue.py
+scripts/process_whisper_queue.py
+scripts/process_transcript_queue.py
+scripts/process_chromadb_queue.py
+scripts/query_chromadb.py
+scripts/run_pipeline_once.py
+```
+
+## Safety notes
+
+Never commit:
+
+- `.env`
+- cookies
+- browser cookie exports
+- Chrome profile files
+- raw audio
+- raw transcripts
+- ChromaDB files
+- SQLite state DB
+- API keys
+- auth tokens
+
+Generated data is intentionally ignored by Git.
+
+## Setup
+
+Create and activate the Conda environment:
+
+```bash
+conda env create -f environment.yml
+conda activate hermes-youtube-rag
+```
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and set at minimum:
+
+```env
+YOUTUBE_CHANNEL_URL=https://www.youtube.com/@SomeChannel/streams
+TITLE_FILTERS=ONE LIFE,1 LIFE
+MAX_DISCOVERY_VIDEOS=50
+MAX_NEW_VIDEOS=1
+```
+
+Initialize local state:
+
+```bash
+python scripts/init_db.py
+python scripts/migrate_db.py
+```
+
+## Run one pipeline pass
+
+```bash
+python scripts/run_pipeline_once.py \
+  --max-discovery-videos 25 \
+  --max-new-videos 1 \
+  --max-transcribe-videos 1 \
+  --max-clean-videos 1 \
+  --max-embed-videos 1
+```
+
+## Query the indexed collection
+
+Retrieval only:
+
+```bash
+python scripts/query_chromadb.py "What is the miracle machine?" --no-ollama
+```
+
+With Ollama inference:
+
+```bash
+python scripts/query_chromadb.py "What is the miracle machine?"
+```
+
+Use a specific Ollama model:
+
+```bash
+python scripts/query_chromadb.py \
+  "What is the miracle machine?" \
+  --ollama-model llama3.2:latest
+```
+
+## Inspect pipeline state
+
+```bash
+sqlite3 .state/youtube_ingest.sqlite \
+"select video_id, ingest_status, audio_status, whisper_status, clean_transcript_status, embedding_status, chunk_count, last_error_type from videos;"
+```
+
+## Self-healing agent direction
+
+The deterministic pipeline now works. The next layer is Hermes Agent supervision.
+
+Example future repair loop:
+
+```text
+If yt-dlp fails with auth/cookie errors:
+  1. classify failure as failed_auth
+  2. retry with --cookies-from-browser chrome
+  3. if successful, save this as a reusable repair skill
+  4. if not successful, ask for manual browser login/cookie refresh
+```
+
+Potential Hermes skills:
+
+```text
+skills/
+  yt_dlp_auth_repair.md
+  pipeline_status_triage.md
+  failed_video_retry.md
+  chromadb_health_check.md
+```
+
+## MVP status
+
+Working end-to-end for at least one video:
+
+```text
+discover
+→ audio download
+→ Whisper transcription
+→ transcript cleanup
+→ ChromaDB embedding
+→ retrieval
+→ Ollama inference
+```
