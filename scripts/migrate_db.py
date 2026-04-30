@@ -64,6 +64,18 @@ def main() -> int:
             "clean_transcript_path",
             "TEXT",
         )
+        add_column_if_missing(
+            conn,
+            "videos",
+            "chunk_count",
+            "INTEGER NOT NULL DEFAULT 0",
+        )
+        add_column_if_missing(
+            conn,
+            "videos",
+            "embedded_at",
+            "TEXT",
+        )
         conn.commit()
 
     print(f"Migration complete: {db_path}")

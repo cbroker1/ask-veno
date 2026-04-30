@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS videos (
     clean_transcript_status TEXT NOT NULL DEFAULT 'not_started',
     clean_transcript_path TEXT,
     chroma_collection TEXT,
+    chunk_count INTEGER NOT NULL DEFAULT 0,
+    embedded_at TEXT,
 
     attempt_count INTEGER NOT NULL DEFAULT 0,
     last_attempt_at TEXT,
