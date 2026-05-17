@@ -1,0 +1,10 @@
+yt-dlp
+chromadb
+sentence-transformers
+duckdb
+pandas
+pydantic
+python-dotenv
+rich
+tqdm
+requests

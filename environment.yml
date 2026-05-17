@@ -1,0 +1,28 @@
+name: hermes-youtube-rag
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.11
+  - pip
+  - ffmpeg
+  - sqlite
+  - git
+  - jq
+
+  # Python basics
+  - pandas
+  - pydantic
+  - python-dotenv
+  - rich
+  - tqdm
+  - requests
+
+  # Installed with pip because these move faster than conda packages
+  - pip:
+      - yt-dlp
+      - chromadb
+      - sentence-transformers
+      - duckdb
