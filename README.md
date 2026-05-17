@@ -23,101 +23,37 @@ Ask any question about the channel's content. The system retrieves the most rele
 
 ---
 
-### ✦ S.T.A.L.K.E.R. Gamma PDA Theme
-
-The entire interface is themed after the iconic PDA device from S.T.A.L.K.E.R. 2: Hope. Every element — from the phosphor glow to the amber terminal fonts to the scanline CRT effect — was designed to feel like a real piece of Stalker tech.
-
-**Features:**
-
-- Dark amber/gold phosphor monitor aesthetic with CRT scanlines
-- Circular progress indicators for pipeline stats
-- Interactive result cards with hover effects
-- Click-to-expand video playback with timestamp deep-links
-- Spinning nuclear loader during LLM generation
-- Custom "Gamma Analysis" answer panel that appears between search and results
-
----
-
 ### ✦ Screenshots
 
-#### Home Dashboard
-The main dashboard showing ingestion stats, search interface, and the full video archive table — all in the Gamma PDA theme.
+#### Hero Shot — Full Dashboard
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                                                                                                 │
-│                                              ⌈ GAMMA PDA ⌋                                                      │
-│                                  YOUTUBE RAG KNOWLEDGE BASE — STALKER GAMMA                                     │
-│                                                                                                                 │
-├─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                                                 │
-│   [● gradient ring]              [● green ring]              [○ empty]              [● amber ring]              │
-│      257                          257                         0                       21959                     │
-│   VIDEOS SCANNED            FULLY PROCESSED                  IN PROGRESS          CHUNKS EMBEDDED             │
-│                                                                                                                 │
-│                                                                                                                 │
-├─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                                                 │
-│                                         ⌁ QUERY THE KNOWLEDGE BASE                                              │
-│                                                                                                                 │
-│   ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│   │ type your question here stalker                                       ⌈ SCAN ▰                    │  │
-│   └─────────────────────────────────────────────────────────────────────────────────────────────────────────┘  │
-│                                                                                                                 │
-├─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                                                 │
-│                                        ▦ VIDEO ARCHIVE                                                          │
-│                                                                                                                 │
-│   ┌──────────────────────────────────────┬──────────┬────────┬──────────┬──────────────┬───┐                 │
-│   │ TITLE                                │ STATUS   │ CHUNKS │ DURATION │ UPLOADED     │ ▶ │                 │
-│   ├──────────────────────────────────────┼──────────┼────────┼──────────┼──────────────┼───┤                 │
-│   │ NEW UPDATE TOMORROW - GAMMA ONE...  │ COMPLETE │   93   │ 2h 12m   │ 2026-05-07   │ ▶ │                 │
-│   │ I'M BACK AGAIN...Also ESPRESSO...  │ COMPLETE │   89   │ 2h 04m   │ 2026-05-06   │ ▶ │                 │
-│   │ Trying Out NEW Texture Mod - G...  │ COMPLETE │   85   │ 2h 08m   │ 2026-05-02   │ ▶ │                 │
-│   │ ARTIFACT SEARCH TIME - GAMMA 1...  │ COMPLETE │   30   │ 49m 55s  │ 2025-03-11   │ ▶ │                 │
-│   │ Time for UPGRADES - GAMMA ONE...  │ COMPLETE │   82   │ 2h 27m   │ 2025-03-09   │ ▶ │                 │
-│   │ Will we get EXPERT TOOLS? - G...  │ COMPLETE │   83   │ 2h 20m   │ 2025-03-09   │ ▶ │                 │
-│   │ Let's Get EXPERT TOOLS - GAM...  │ COMPLETE │   74   │ 2h 16m   │ 2025-03-07   │ ▶ │                 │
-│   │ Will Red Forest be my END? - G... │ COMPLETE │  103   │ 2h 55m   │ 2025-03-06   │ ▶ │                 │
-│   └──────────────────────────────────────┴──────────┴────────┴──────────┴──────────────┴───┘                 │
-│                                                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-```
+![Ask Veno Dashboard](https://raw.githubusercontent.com/cbroker1/ask-veno/main/docs/screenshots/hero-home-dashboard.png)
 
-#### Search Results with Gamma Analysis
-After submitting a query — the Gamma Analysis panel renders directly below the search bar with the LLM-generated summary, followed by source-anchored results with expandable video players.
+The home dashboard featuring the Stalker Gamma PDA theme: amber phosphor glow, CRT scanlines, circular progress stats, interactive search bar, and the full video archive table.
 
-```
-┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ type your question here stalker                                      ⌈ SCAN ▰                     │
-├────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ ⌁ Gamma Analysis                                                                                                         │
-│ ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐ │
-│ │ [Summary text from local Ollama model — direct answer to your question with inline source references]                  │ │
-│ │                                                                                                                       │ │
-│ │ Source: None found.                                                                                                   │ │
-│ └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘ │
-│                                                                                                                             │
-├────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ ▦ Results (8 matches)                                                                                                       │
-│ ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐ │
-│ │ ⌁ 8 matches found                                                                                                           │ │
-│ │                                                                                                                             │ │
-│ │ ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐ │ │
-│ │ │ CLICK TO EXPAND VIDEO                                                                                                      │ │ │
-│ │ │ [Video card with hover color shift, expand animation                                                                    │ │ │
-│ │ │  timestamped deep-link into source video                                                                                │ │ │
-│ │ │  embedded YouTube player appears on click                                                                               │ │ │
-│ │ │  full bottom HUD/controls visible                                                                                       │ │ │
-│ │ └────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘ │ │
-│ │                                                                                                                             │ │
-│ │ ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐ │ │
-│ │ │ CLICK TO EXPAND VIDEO                                                                                                      │ │ │
-│ │ │ [Second result card — hover effects, expand, inline player                                                              │ │ │
-│ └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘ │
-│                                                                                                                             │
-└────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-```
+#### Stats Panel
+
+![Stats Panel](https://raw.githubusercontent.com/cbroker1/ask-veno/main/docs/screenshots/stats-panel.png)
+
+Real-time pipeline metrics at a glance: videos scanned, processing completion, chunk count, and anomaly tracking — all rendered as animated circular gauges.
+
+#### Video Archive
+
+![Video Archive](https://raw.githubusercontent.com/cbroker1/ask-veno/main/docs/screenshots/video-archive-table.png)
+
+A sortable data table of all ingested video content. Each row shows duration, chunk count, upload date, and status. Every entry has a deep-link to the source video.
+
+#### Search Results
+
+![Search Results](https://raw.githubusercontent.com/cbroker1/ask-veno/main/docs/screenshots/search-results-page.png)
+
+After submitting a query: the Gamma Analysis panel renders directly below the search bar with the LLM-generated summary, followed by source-anchored results with expandable video players.
+
+#### Stalker Gamma PDA Theme
+
+![Gamma PDA Theme](https://raw.githubusercontent.com/cbroker1/ask-veno/main/docs/screenshots/gamma-pda-theme.png)
+
+The full aesthetic: dark amber/gold phosphor monitor look, scanline CRT overlay, Orbitron + Share Tech Mono fonts, glowing text shadows, and interactive card hover effects.
 
 ---
 
@@ -136,8 +72,9 @@ After submitting a query — the Gamma Analysis panel renders directly below the
 ```
 
 **Tech Stack:**
+
 | Layer | Technology |
-|-------|-----------|
+|-------|--------|
 | Dashboard | FastAPI + Jinja (single file) |
 | Vector DB | ChromaDB (persisted) |
 | Embeddings | intfloat/multilingual-e5-large |
@@ -184,12 +121,12 @@ Then open `http://localhost:8000` in your browser.
 ### ✦ Key UI Details
 
 - **Phosphor glow** — Each text element has a subtle `text-shadow` glow mimicking CRT phosphor excitation
-- **Scanlines** — CSS `linear-gradient` on a `::after` overlay creates horizontal scanline effect
+- **Scanlines** — CSS `linear-gradient` on a pseudo-element overlay creates horizontal scanline effect
 - **Progress rings** — Circular SVG/progress elements show pipeline completion at a glance
 - **Interactive cards** — Hover triggers amber glow transition; click expands inline video player
 - **Loading state** — Spinning nuclear ☢ loader during Ollama inference with fade-out on completion
 - **Responsive layout** — Grid-based stat panels collapse gracefully on narrower viewports
-- **No external fonts loaded at runtime** — Orbitron loaded via Google Fonts once, then system fallbacks
+- **No external fonts loaded at runtime** — Orbitron loaded once, then system fallbacks
 
 ---
 
