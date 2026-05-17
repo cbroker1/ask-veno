@@ -25,35 +25,17 @@ Ask any question about the channel's content. The system retrieves the most rele
 
 ### ✦ Screenshots
 
-#### Hero Shot — Full Dashboard
+#### Home Dashboard
 
-![Ask Veno Dashboard](https://raw.githubusercontent.com/cbroker1/ask-veno/main/docs/screenshots/hero-home-dashboard.png)
+![Home Dashboard](https://raw.githubusercontent.com/cbroker1/ask-veno/main/docs/screenshots/hero-home-dashboard.png)
 
-The home dashboard featuring the Stalker Gamma PDA theme: amber phosphor glow, CRT scanlines, circular progress stats, interactive search bar, and the full video archive table.
-
-#### Stats Panel
-
-![Stats Panel](https://raw.githubusercontent.com/cbroker1/ask-veno/main/docs/screenshots/stats-panel.png)
-
-Real-time pipeline metrics at a glance: videos scanned, processing completion, chunk count, and anomaly tracking — all rendered as animated circular gauges.
-
-#### Video Archive
-
-![Video Archive](https://raw.githubusercontent.com/cbroker1/ask-veno/main/docs/screenshots/video-archive-table.png)
-
-A sortable data table of all ingested video content. Each row shows duration, chunk count, upload date, and status. Every entry has a deep-link to the source video.
+Full dashboard with the Stalker Gamma PDA aesthetic — amber phosphor glow, CRT scanlines, circular progress stats, interactive search bar, and the video archive table.
 
 #### Search Results
 
 ![Search Results](https://raw.githubusercontent.com/cbroker1/ask-veno/main/docs/screenshots/search-results-page.png)
 
 After submitting a query: the Gamma Analysis panel renders directly below the search bar with the LLM-generated summary, followed by source-anchored results with expandable video players.
-
-#### Stalker Gamma PDA Theme
-
-![Gamma PDA Theme](https://raw.githubusercontent.com/cbroker1/ask-veno/main/docs/screenshots/gamma-pda-theme.png)
-
-The full aesthetic: dark amber/gold phosphor monitor look, scanline CRT overlay, Orbitron + Share Tech Mono fonts, glowing text shadows, and interactive card hover effects.
 
 ---
 
@@ -71,10 +53,8 @@ The full aesthetic: dark amber/gold phosphor monitor look, scanline CRT overlay,
                          └──────────────┘
 ```
 
-**Tech Stack:**
-
 | Layer | Technology |
-|-------|--------|
+|-------|------|
 | Dashboard | FastAPI + Jinja (single file) |
 | Vector DB | ChromaDB (persisted) |
 | Embeddings | intfloat/multilingual-e5-large |
@@ -133,7 +113,7 @@ Then open `http://localhost:8000` in your browser.
 ### ✦ Pipeline Stats (current run)
 
 | Metric | Value |
-|--------|-------|
+|-------|--------|
 | Videos ingested | 257 |
 | Total chunks | 21,959 |
 | Processing status | 100% complete |
