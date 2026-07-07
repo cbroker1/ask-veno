@@ -36,14 +36,14 @@ Full dashboard with the Stalker Gamma PDA aesthetic — amber phosphor glow, CRT
 ### ✦ Architecture
 
 ```
-┌─────────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│                 │     │              │     │              │     │              │
+┌─────────────────┐      ┌──────────────┐     ┌───────────────┐      ┌──────────────┐
+│                 │      │              │     │               │      │              │
 │  FastAPI UI     │────▶│ ChromaDB     │────▶│ multilingual- │────▶│  Ollama      │
-│  (Stalker PDA   │     │ youtube_     │     │ e5-large     │     │  qwen3:0.6b  │
-│   "Gamma"       │     │ chunks       │     │ embeddings   │     │  (on CPU)    │
-│   Theme)        │     │ (257 videos, │     │ (on CPU)     │     │              │
-│                 │     │  21,959       │     │              │     │              │
-└─────────────────┘     │  chunks)      │     └──────────────┘     └──────────────┘
+│  (Stalker PDA   │      │ youtube_     │     │ e5-large      │      │  qwen3:0.6b  │
+│   "Gamma"       │      │ chunks       │     │ embeddings    │      │  (on CPU)    │
+│   Theme)        │      │ (257 videos, │     │ (on CPU)      │      │              │
+│                 │      │  21,959      │     │               │      │              │
+└─────────────────┘      │  chunks)     │     └───────────────┘      └──────────────┘
                          └──────────────┘
 ```
 
