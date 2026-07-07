@@ -55,7 +55,7 @@ def load_config(args: argparse.Namespace) -> Config:
         embed_model_name=args.embed_model_name or os.getenv("EMBED_MODEL_NAME", "intfloat/multilingual-e5-large"),
         retrieval_top_k=args.top_k or int(os.getenv("RETRIEVAL_TOP_K", "8")),
         ollama_server=args.ollama_server or os.getenv("OLLAMA_SERVER", "localhost"),
-        ollama_model=args.ollama_model or os.getenv("OLLAMA_MODEL", os.getenv("QWEN_MODEL", "qwen3.6:latest")),
+        ollama_model=args.ollama_model or os.getenv("OLLAMA_MODEL", os.getenv("QWEN_MODEL", "qwen3:1.7b")),
         ollama_timeout_seconds=int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "300")),
         no_ollama=args.no_ollama,
         show_context=args.show_context,
