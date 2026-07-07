@@ -73,7 +73,6 @@ cd ask-veno
 # Environment
 conda env create -f environment.yml
 conda activate ask-veno
-pip install -r requirements.txt
 
 # Ollama models needed
 ollama pull qwen3:0.6b
