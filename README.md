@@ -141,7 +141,7 @@ Use a specific Ollama model:
 ```bash
 python scripts/query_chromadb.py \
   "What is the miracle machine?" \
-  --ollama-model llama3.2:latest
+  --ollama-model qwen3.5:0.8b
 ```
 
 ## Inspect pipeline state
