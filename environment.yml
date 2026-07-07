@@ -5,25 +5,25 @@ channels:
   - defaults
 
 dependencies:
-  - python=3.11
+  - python=3.11.15
   - pip
   - ffmpeg
   - sqlite
   - git
   - jq
 
-  # Python basics
-  - pandas
-  - pydantic
-  - python-dotenv
-  - rich
-  - tqdm
-  - requests
+  # Python basics (conda-managed)
+  - pandas=3.0.3
+  - pydantic=2.13.4
+  - python-dotenv=1.2.2
+  - rich=15.0.0
+  - tqdm=4.68.3
+  - requests=2.34.2
 
   # Installed with pip because these move faster than conda packages
   - pip:
-      - yt-dlp
-      - chromadb
-      - sentence-transformers
-      - duckdb
-      - faster-whisper
+      - yt-dlp==2026.7.4
+      - chromadb==1.5.9
+      - sentence-transformers==5.6.0
+      - duckdb==1.5.4
+      - faster-whisper==1.2.1
