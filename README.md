@@ -31,12 +31,6 @@ Ask any question about the channel's content. The system retrieves the most rele
 
 Full dashboard with the Stalker Gamma PDA aesthetic — amber phosphor glow, CRT scanlines, circular progress stats, interactive search bar, and the video archive table.
 
-#### Search Results
-
-![Search Results](https://raw.githubusercontent.com/cbroker1/ask-veno/main/docs/screenshots/search-results-page.png)
-
-After submitting a query: the Gamma Analysis panel renders directly below the search bar with the LLM-generated summary, followed by source-anchored results with expandable video players.
-
 ---
 
 ### ✦ Architecture
