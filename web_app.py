@@ -166,6 +166,7 @@ def _llm_answer(query: str, chunks: list) -> str:
         "You are a knowledge base assistant answering questions from YouTube video transcripts. "
         "Answer directly and concisely in 3-5 sentences. Use only the provided chunks. "
         "Give a clear, direct answer first, then briefly cite your sources below. "
+        "Put each source on its own line in the format: [start-end] Video Title. "
         "DO NOT just list videos — summarize the answer to the question."
     )
     prompt = f"Question: {query}\n\nSource chunks:\n{context}\n\nAnswer:"
@@ -176,7 +177,7 @@ def _llm_answer(query: str, chunks: list) -> str:
             "prompt": prompt,
             "system": system,
             "stream": False,
-            "options": {"num_predict": 256, "temperature": 0.2}
+            "options": {"num_predict": 1024, "temperature": 0.2}
         }, timeout=120)
         if resp.status_code == 200:
             return resp.json().get("response", "").strip()
