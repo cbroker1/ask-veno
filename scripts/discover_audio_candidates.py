@@ -2,12 +2,13 @@
 """
 Discover YouTube audio candidates and persist them into SQLite.
 
-This script is based on the existing notebook workflow:
+Workflow:
 
-- use yt-dlp with extract_flat=True
-- scan a channel / streams URL
-- match videos by title substring
-- save video_id/title/url into a persistent registry
+- Use yt-dlp with extract_flat=True for fast channel / streams discovery
+- Scan a channel / streams URL
+- Match videos by title substring
+- Enrich only the matched videos with full metadata so fields like upload_date are populated
+- Save video_id/title/url/upload_date/duration into a persistent SQLite registry
 
 It does NOT download audio.
 It does NOT run Whisper.
@@ -46,6 +47,7 @@ class Config:
     browser: str
     use_cookies_txt_fallback: bool
     cookies_txt_path: Path
+    enrich_metadata: bool
     dry_run: bool
 
 
@@ -104,6 +106,13 @@ def load_config(args: argparse.Namespace) -> Config:
 
     cookies_txt_path = Path(args.cookies_txt_path or os.getenv("COOKIES_TXT_PATH", "cookies.txt"))
 
+    enrich_metadata = parse_bool(
+        args.enrich_metadata
+        if args.enrich_metadata is not None
+        else os.getenv("DISCOVERY_ENRICH_METADATA"),
+        default=True,
+    )
+
     return Config(
         channel_url=channel_url,
         title_filters=split_filters(raw_filters),
@@ -113,19 +122,20 @@ def load_config(args: argparse.Namespace) -> Config:
         browser=browser,
         use_cookies_txt_fallback=use_cookies_txt_fallback,
         cookies_txt_path=cookies_txt_path,
+        enrich_metadata=enrich_metadata,
         dry_run=args.dry_run,
     )
 
 
-def build_ydl_opts(config: Config, cookie_mode: str) -> dict[str, Any]:
+def build_ydl_opts(config: Config, cookie_mode: str, *, extract_flat: bool) -> dict[str, Any]:
     opts: dict[str, Any] = {
         "quiet": True,
-        "extract_flat": True,
+        "extract_flat": extract_flat,
         "ignoreerrors": True,
         "skip_download": True,
     }
 
-    if config.max_discovery_videos:
+    if extract_flat and config.max_discovery_videos:
         opts["playlistend"] = config.max_discovery_videos
 
     if cookie_mode == "browser":
@@ -136,27 +146,51 @@ def build_ydl_opts(config: Config, cookie_mode: str) -> dict[str, Any]:
     return opts
 
 
-def discover_raw(config: Config) -> dict[str, Any]:
+def cookie_attempts(config: Config, *, extract_flat: bool) -> list[tuple[str, dict[str, Any]]]:
     attempts: list[tuple[str, dict[str, Any]]] = []
 
     if config.use_browser_cookies:
-        attempts.append(("browser", build_ydl_opts(config, "browser")))
+        attempts.append(
+            (
+                "browser",
+                build_ydl_opts(config, "browser", extract_flat=extract_flat),
+            )
+        )
     else:
-        attempts.append(("none", build_ydl_opts(config, "none")))
+        attempts.append(
+            (
+                "none",
+                build_ydl_opts(config, "none", extract_flat=extract_flat),
+            )
+        )
 
     if config.use_cookies_txt_fallback and config.cookies_txt_path.exists():
-        attempts.append(("cookies_txt", build_ydl_opts(config, "cookies_txt")))
+        attempts.append(
+            (
+                "cookies_txt",
+                build_ydl_opts(config, "cookies_txt", extract_flat=extract_flat),
+            )
+        )
 
+    return attempts
+
+
+def discover_raw(config: Config) -> dict[str, Any]:
     last_error: Exception | None = None
 
-    for mode, opts in attempts:
+    for mode, opts in cookie_attempts(config, extract_flat=True):
         try:
-            console.print(f"[bold]Running yt-dlp discovery[/bold] using cookie mode: [cyan]{mode}[/cyan]")
+            console.print(
+                f"[bold]Running yt-dlp discovery[/bold] using cookie mode: [cyan]{mode}[/cyan]"
+            )
             with yt_dlp.YoutubeDL(opts) as ydl:
                 data = ydl.extract_info(config.channel_url, download=False)
-                if not isinstance(data, dict):
-                    raise RuntimeError("yt-dlp returned unexpected non-dict response.")
-                return data
+
+            if not isinstance(data, dict):
+                raise RuntimeError("yt-dlp returned unexpected non-dict response.")
+
+            return data
+
         except Exception as exc:
             last_error = exc
             console.print(f"[yellow]Discovery attempt failed with mode {mode}: {exc}[/yellow]")
@@ -175,6 +209,27 @@ def video_url_from_entry(entry: dict[str, Any]) -> str | None:
     url = entry.get("url")
     if isinstance(url, str) and url.startswith("http"):
         return url
+
+    return None
+
+
+def normalize_upload_date_from_info(info: dict[str, Any]) -> str | None:
+    """
+    yt-dlp usually returns upload_date as YYYYMMDD.
+
+    For livestreams or unusual YouTube entries, upload_date may be absent.
+    In that case, try timestamp/release_timestamp and convert it to YYYYMMDD.
+    """
+    upload_date = info.get("upload_date")
+    if upload_date:
+        return str(upload_date)
+
+    timestamp = info.get("timestamp") or info.get("release_timestamp")
+    if timestamp:
+        try:
+            return datetime.fromtimestamp(int(timestamp), timezone.utc).strftime("%Y%m%d")
+        except Exception:
+            return None
 
     return None
 
@@ -212,6 +267,99 @@ def extract_matches(data: dict[str, Any], title_filters: list[str]) -> list[dict
                 "upload_date": entry.get("upload_date"),
             }
         )
+
+    return matches
+
+
+def enrich_matches_with_full_metadata(
+    config: Config,
+    matches: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Flat channel extraction is fast but often misses metadata like upload_date.
+
+    This enriches only the already-matched videos with full per-video metadata,
+    avoiding a full metadata pull for every channel item.
+    """
+    if not matches:
+        return matches
+
+    if not config.enrich_metadata:
+        console.print("[yellow]Metadata enrichment disabled.[/yellow]")
+        return matches
+
+    console.print("[bold]Enriching matched videos with full metadata...[/bold]")
+
+    total = len(matches)
+    enriched = 0
+    failed = 0
+
+    # Try the same cookie modes as discovery.
+    # Usually only the first working mode is needed.
+    attempts = cookie_attempts(config, extract_flat=False)
+
+    for idx, video in enumerate(matches, start=1):
+        video_id = video.get("video_id")
+        video_url = video.get("url")
+
+        if not video_url:
+            continue
+
+        # Skip if we already got everything useful from flat mode.
+        if video.get("upload_date") and video.get("duration"):
+            continue
+
+        console.print(f"Enriching {idx}/{total}: {video_id}")
+
+        last_error: Exception | None = None
+        info: dict[str, Any] | None = None
+
+        for mode, opts in attempts:
+            try:
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    result = ydl.extract_info(str(video_url), download=False)
+
+                if isinstance(result, dict):
+                    info = result
+                    break
+
+            except Exception as exc:
+                last_error = exc
+                console.print(
+                    f"[yellow]Metadata enrich attempt failed for {video_id} "
+                    f"with mode {mode}: {exc}[/yellow]"
+                )
+
+        if not info:
+            failed += 1
+            console.print(
+                f"[yellow]Could not enrich metadata for {video_id}. "
+                f"Last error: {last_error}[/yellow]"
+            )
+            continue
+
+        upload_date = normalize_upload_date_from_info(info)
+        duration = info.get("duration")
+
+        if upload_date:
+            video["upload_date"] = upload_date
+
+        if duration and not video.get("duration"):
+            video["duration"] = duration
+
+        # Keep title/url fresh if full metadata has better values.
+        if info.get("title"):
+            video["title"] = str(info["title"])
+
+        if info.get("webpage_url"):
+            video["url"] = str(info["webpage_url"])
+
+        enriched += 1
+
+    console.print(
+        f"[green]Metadata enrichment complete:[/green] "
+        f"{enriched} enriched, {failed} failed"
+    )
 
     return matches
 
@@ -263,6 +411,7 @@ def upsert_matches(config: Config, matches: list[dict[str, Any]]) -> dict[str, i
                 "channel_url": config.channel_url,
                 "title_filters": config.title_filters,
                 "max_discovery_videos": config.max_discovery_videos,
+                "enrich_metadata": config.enrich_metadata,
             },
         )
 
@@ -378,15 +527,25 @@ def print_matches(matches: list[dict[str, Any]], limit: int = 20) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
+
     parser.add_argument("--channel-url")
     parser.add_argument("--title-filters", help='Comma-separated filters, e.g. "ONE LIFE,1 LIFE"')
     parser.add_argument("--db-path")
     parser.add_argument("--max-discovery-videos", type=int)
+
     parser.add_argument("--browser", help="Browser for yt-dlp cookies-from-browser. Default: chrome")
     parser.add_argument("--cookies-txt-path")
     parser.add_argument("--use-browser-cookies", choices=["true", "false"])
     parser.add_argument("--use-cookies-txt-fallback", choices=["true", "false"])
+
+    parser.add_argument(
+        "--enrich-metadata",
+        choices=["true", "false"],
+        help="Fetch full metadata for matched videos so upload_date is populated. Default: true",
+    )
+
     parser.add_argument("--dry-run", action="store_true")
+
     return parser.parse_args()
 
 
@@ -405,12 +564,15 @@ def main() -> int:
     console.print(f"Use browser cookies: {config.use_browser_cookies}")
     console.print(f"Browser: {config.browser}")
     console.print(f"Cookies.txt fallback: {config.use_cookies_txt_fallback}")
+    console.print(f"Enrich metadata: {config.enrich_metadata}")
     console.print(f"Dry run: {config.dry_run}")
     console.print()
 
     try:
         data = discover_raw(config)
         matches = extract_matches(data, config.title_filters)
+        console.print(f"[green]Matched videos before enrichment:[/green] {len(matches)}")
+        matches = enrich_matches_with_full_metadata(config, matches)
     except Exception as exc:
         console.print(f"[red]Discovery failed:[/red] {exc}")
         return 1

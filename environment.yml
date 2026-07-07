@@ -1,4 +1,4 @@
-name: hermes-youtube-rag
+name: ask-veno
 
 channels:
   - conda-forge
@@ -26,3 +26,4 @@ dependencies:
       - chromadb
       - sentence-transformers
       - duckdb
+      - faster-whisper

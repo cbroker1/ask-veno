@@ -67,7 +67,7 @@ Create and activate the Conda environment:
 
 ```bash
 conda env create -f environment.yml
-conda activate hermes-youtube-rag
+conda activate ask-veno
 ```
 
 Copy the example environment file:
@@ -79,10 +79,29 @@ cp .env.example .env
 Edit `.env` and set at minimum:
 
 ```env
-YOUTUBE_CHANNEL_URL=https://www.youtube.com/@SomeChannel/streams
+# YouTube discovery
+YOUTUBE_CHANNEL_URL=https://www.youtube.com/@Venoxium/streams
 TITLE_FILTERS=ONE LIFE,1 LIFE
 MAX_DISCOVERY_VIDEOS=50
 MAX_NEW_VIDEOS=1
+
+# SQLite state
+SQLITE_DB_PATH=.state/youtube_ingest.sqlite
+
+# Transcription queue
+MAX_TRANSCRIBE_VIDEOS=1
+
+# faster-whisper on RTX A6000
+WHISPER_MODEL=large-v3
+WHISPER_DEVICE=cuda:0
+WHISPER_COMPUTE_TYPE=float16
+WHISPER_BATCH_SIZE=64
+WHISPER_BEAM_SIZE=10
+WHISPER_VAD_FILTER=true
+WHISPER_WORD_TIMESTAMPS=true
+
+# Discovery metadata enrichment
+DISCOVERY_ENRICH_METADATA=true
 ```
 
 Initialize local state:
