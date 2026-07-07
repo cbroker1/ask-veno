@@ -165,8 +165,6 @@ def _llm_answer(query: str, chunks: list) -> str:
     system = (
         "You are a knowledge base assistant answering questions from YouTube video transcripts. "
         "Answer directly and concisely in 3-5 sentences. Use only the provided chunks. "
-        "Give a clear, direct answer first, then briefly cite your sources below. "
-        "Put each source on its own line in the format: [start-end] Video Title. "
         "DO NOT just list videos — summarize the answer to the question."
     )
     prompt = f"Question: {query}\n\nSource chunks:\n{context}\n\nAnswer:"
@@ -314,6 +312,34 @@ async def search(request: Request, query: str = Form(...)):
             f'<div class="summary-response">{summary}</div></div>'
         )
 
+    # Format chunk metadata for display below summary
+    sources_html = ""
+    if chunks:
+        sources_html = '<div class="sources-card"><div class="sources-label">▦ Sources</div><div class="sources-list">'
+        for c in chunks:
+            vid = c.get("vid", "N/A")
+            video_id = vid
+            if video_id and video_id.startswith("youtube_id:"):
+                video_id = video_id.replace("youtube_id:", "")
+            start_hms = c.get("s", "00:00:00")
+            seconds = 0
+            if start_hms and start_hms != "N/A":
+                try:
+                    parts = start_hms.split(":")
+                    hours = int(parts[0]) if parts[0] else 0
+                    minutes = int(parts[1]) if len(parts) > 1 and parts[1] else 0
+                    secs = int(parts[2]) if len(parts) > 2 and parts[2] else 0
+                    seconds = hours * 3600 + minutes * 60 + secs
+                except (ValueError, IndexError):
+                    seconds = 0
+            sp = c["sim_pct"]
+            cl = f"sim-{min(10, int(sp/10))}" if sp > 0 else "sim-0"
+            sources_html += f'''<div class="source-item" data-vid="{video_id}" data-start="{seconds}">
+<div class="source-title">{c["vt"]}</div>
+<div class="source-meta"><span class="sim-meter {cl}"></span><span class="sim-text">{sp}% match</span><span class="sep">│</span><span class="mono">{c["s"]}–{c["e"]}</span></div>
+</div>'''
+        sources_html += '</div></div>'
+
     ctx = dict(
         total=stats["total"],
         completed=stats["completed"],
@@ -326,6 +352,7 @@ async def search(request: Request, query: str = Form(...)):
         r=results_html,
         rc=rc,
         summary_html=summary_html,
+        sources_html=sources_html,
         v=tables_html,
         has_summary=has_summary,
         r_if=bool(chunks),
@@ -381,6 +408,29 @@ a:hover{color:#f5d060;text-shadow:0 0 8px #d4a829}
 .summary-card{background:linear-gradient(160deg,#141208,#0f0d06);border:1px solid #2a2510;border-left:3px solid #40e040;border-radius:3px;padding:20px;margin-bottom:20px}
 .summary-label{font-family:'Orbitron',sans-serif;font-size:.7rem;letter-spacing:.12em;color:#40e040;margin-bottom:10px;text-transform:uppercase}
 .summary-response{font-size:.88rem;color:#c8b446;line-height:1.7;border-top:1px solid #1e1a0c;padding-top:12px;white-space:pre-wrap}
+.sources-card{background:linear-gradient(160deg,#141208,#0f0d06);border:1px solid #2a2510;border-left:3px solid #d4a829;border-radius:3px;padding:16px 20px;margin-bottom:20px}
+.sources-label{font-family:'Orbitron',sans-serif;font-size:.7rem;letter-spacing:.12em;color:#d4a829;margin-bottom:10px;text-transform:uppercase}
+.sources-list{display:flex;flex-direction:column;gap:8px}
+.source-item{cursor:pointer;padding:10px 12px;background:#0a0a08;border:1px solid #2a2510;border-radius:3px;transition:border-color .2s,background .2s}
+.source-item:hover{border-color:#d4a829;background:#12100a}
+.source-item.expanded{border-color:#40e040;background:#0e0c04}
+.source-title{font-size:.82rem;color:#d4a829;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.source-meta{display:flex;align-items:center;gap:12px;font-size:.7rem;color:#8a7e3a}
+.source-meta .sim-meter{width:56px;height:4px;border-radius:2px;background:#1a1700;overflow:hidden;position:relative}
+.source-meta .sim-meter::after{content:'';position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:repeating-linear-gradient(90deg,#40e040,#40e040 2px,transparent 2px,transparent 4px)}
+.source-meta .sim-10::after,.source-meta .sim-9::after,.source-meta .sim-8::after,.source-meta .sim-7::after{width:100%}
+.source-meta .sim-6::after,.source-meta .sim-5::after{width:80%}
+.source-meta .sim-4::after,.source-meta .sim-3::after{width:60%}
+.source-meta .sim-2::after{width:40%}
+.source-meta .sim-1::after{width:20%}
+.source-meta .sim-0::after{width:0}
+.source-meta .sim-text{font-size:.65rem;color:#6a6230}
+.source-meta .sep{color:#2a2510}
+.source-meta .mono{font-family:'Share Tech Mono',monospace;font-size:.7rem}
+.source-embed{display:none;margin-top:10px}
+.source-item.expanded .source-embed{display:block}
+.source-embed .embed-frame{width:100%;height:300px;position:relative;background:#0a0a08;border:1px solid #2a2510;border-radius:3px;overflow:visible}
+.source-embed iframe{position:absolute;inset:0;width:100%;height:100%;border:none;background:#0a0a08}
 .results-box{margin-top:20px}
 .results-title{font-family:'Orbitron',sans-serif;font-size:.85rem;letter-spacing:.1em;color:#a09640;margin-bottom:14px;text-transform:uppercase}
 .results-list{display:flex;flex-direction:column;gap:12px}
@@ -469,6 +519,7 @@ td{padding:12px 18px;color:#a09640}
 </form>
 </div>
 {{summary_html}}
+{{sources_html}}
 {{r_if}}
 <div class="results-box">
 <h2 class="results-title">▦ Results ({{rc}} matches)</h2>
@@ -506,30 +557,60 @@ document.addEventListener('DOMContentLoaded', function() {
     // ── Expandable result cards ──
     document.addEventListener('click', function(e) {
         var card = e.target.closest('.result-card');
-        if (!card) return;
-        
-        // Collapse any other open cards first
-        document.querySelectorAll('.result-card.expanded').forEach(function(other) {
-            if (other !== card) {
-                other.classList.remove('expanded');
-                var iframe = other.querySelector('iframe');
-                if (iframe && iframe.src && iframe.dataset.filled === 'true') {
-                    setTimeout(function() { iframe.src = ''; iframe.dataset.filled = ''; }, 300);
+        if (card) {
+            // Collapse any other open cards first
+            document.querySelectorAll('.result-card.expanded').forEach(function(other) {
+                if (other !== card) {
+                    other.classList.remove('expanded');
+                    var iframe = other.querySelector('iframe');
+                    if (iframe && iframe.src && iframe.dataset.filled === 'true') {
+                        setTimeout(function() { iframe.src = ''; iframe.dataset.filled = ''; }, 300);
+                    }
+                }
+            });
+            
+            card.classList.toggle('expanded');
+            
+            if (card.classList.contains('expanded')) {
+                var vid = card.dataset.vid;
+                var start = card.dataset.start || 0;
+                var iframe = card.querySelector('iframe');
+                if (vid && vid !== 'N/A' && iframe && !iframe.dataset.filled) {
+                    var src = 'https://www.youtube.com/embed/' + vid + '?autoplay=1&start=' + start + '&rel=0&origin=' + encodeURIComponent(window.location.origin);
+                    iframe.src = src;
+                    iframe.dataset.filled = 'true';
                 }
             }
-        });
+            return;
+        }
         
-        card.classList.toggle('expanded');
-        
-        if (card.classList.contains('expanded')) {
-            var vid = card.dataset.vid;
-            var start = card.dataset.start || 0;
-            var iframe = card.querySelector('iframe');
-            if (vid && vid !== 'N/A' && iframe && !iframe.dataset.filled) {
-                var src = 'https://www.youtube.com/embed/' + vid + '?autoplay=1&start=' + start + '&rel=0&origin=' + encodeURIComponent(window.location.origin);
-                iframe.src = src;
-                iframe.dataset.filled = 'true';
+        // Expandable source items
+        var source = e.target.closest('.source-item');
+        if (source) {
+            // Collapse any other open sources
+            document.querySelectorAll('.source-item.expanded').forEach(function(other) {
+                if (other !== source) {
+                    other.classList.remove('expanded');
+                    var iframe = other.querySelector('iframe');
+                    if (iframe && iframe.src && iframe.dataset.filled === 'true') {
+                        setTimeout(function() { iframe.src = ''; iframe.dataset.filled = ''; }, 300);
+                    }
+                }
+            });
+            
+            source.classList.toggle('expanded');
+            
+            if (source.classList.contains('expanded')) {
+                var vid = source.dataset.vid;
+                var start = source.dataset.start || 0;
+                var iframe = source.querySelector('iframe');
+                if (vid && vid !== 'N/A' && iframe && !iframe.dataset.filled) {
+                    var src = 'https://www.youtube.com/embed/' + vid + '?autoplay=1&start=' + start + '&rel=0&origin=' + encodeURIComponent(window.location.origin);
+                    iframe.src = src;
+                    iframe.dataset.filled = 'true';
+                }
             }
+            return;
         }
     });
     
