@@ -27,7 +27,7 @@ Ask any question about the channel's content. The system retrieves the most rele
 
 #### Home Dashboard
 
-![Home Dashboard](https://raw.githubusercontent.com/cbroker1/ask-veno/main/docs/screenshots/hero-home-dashboard.png)
+![Home Dashboard](docs/screenshots/ui.png)
 
 Full dashboard with the Stalker Gamma PDA aesthetic — amber phosphor glow, CRT scanlines, circular progress stats, interactive search bar, and the video archive table.
 
