@@ -1,190 +1,135 @@
-# Hermes Self-Healing YouTube RAG Agent
+# ⌈ Ask Veno ⌋
 
-A local-first YouTube ingestion and RAG pipeline designed to become a self-healing agent workflow with Hermes Agent.
+## Stalker Gamma PDA — Local YouTube RAG Dashboard
 
-This project started as a set of Jupyter notebooks and was refactored into a stateful, queue-driven Python pipeline.
+A fully offline, single-file FastAPI dashboard that turns any YouTube channel into a searchable knowledge base — styled as a S.T.A.L.K.E.R. Gamma PDA.
 
-## Current MVP
+**No cloud APIs. No paid services. Just ChromaDB + Ollama + FastAPI running on your own hardware.**
 
-The current pipeline can:
+---
 
-1. Discover YouTube videos from a channel using title filters.
-2. Store candidate videos in SQLite.
-3. Download audio only with `yt-dlp`.
-4. Transcribe audio with Whisper on CUDA.
-5. Clean Whisper transcripts into simplified timestamped segments.
-6. Chunk and embed transcripts into ChromaDB.
-7. Query ChromaDB and send retrieved context to Ollama.
-8. Run one pipeline pass with a single command.
+### ✦ What it does
 
-## Pipeline
-
-```text
+```
 YouTube channel
-  → discover matching videos
-  → SQLite registry
-  → download queued audio
-  → Whisper transcription
-  → transcript cleanup
-  → ChromaDB embedding
-  → Ollama inference
+  → whisper transcriptions
+  → chunked embeddings (intfloat/multilingual-e5-large)
+  → ChromaDB vector store (21,959 chunks across 257 videos)
+  → local Ollama query with qwen3:0.6b
+  → direct answer + source-anchored results
 ```
 
-## Main scripts
+Ask any question about the channel's content. The system retrieves the most relevant transcript chunks, generates a direct summary using a local LLM, and returns source-anchored video clips with timestamps so you can jump straight to the relevant moment.
 
-```text
-scripts/init_db.py
-scripts/migrate_db.py
-scripts/discover_audio_candidates.py
-scripts/process_audio_queue.py
-scripts/process_whisper_queue.py
-scripts/process_transcript_queue.py
-scripts/process_chromadb_queue.py
-scripts/query_chromadb.py
-scripts/run_pipeline_once.py
+---
+
+### ✦ Screenshots
+
+#### Home Dashboard
+
+![Home Dashboard](https://raw.githubusercontent.com/cbroker1/ask-veno/main/docs/screenshots/hero-home-dashboard.png)
+
+Full dashboard with the Stalker Gamma PDA aesthetic — amber phosphor glow, CRT scanlines, circular progress stats, interactive search bar, and the video archive table.
+
+#### Search Results
+
+![Search Results](https://raw.githubusercontent.com/cbroker1/ask-veno/main/docs/screenshots/search-results-page.png)
+
+After submitting a query: the Gamma Analysis panel renders directly below the search bar with the LLM-generated summary, followed by source-anchored results with expandable video players.
+
+---
+
+### ✦ Architecture
+
+```
+┌─────────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│                 │     │              │     │              │     │              │
+│  FastAPI UI     │────▶│ ChromaDB     │────▶│ multilingual- │────▶│  Ollama      │
+│  (Stalker PDA   │     │ youtube_     │     │ e5-large     │     │  qwen3:0.6b  │
+│   "Gamma"       │     │ chunks       │     │ embeddings   │     │  (on CPU)    │
+│   Theme)        │     │ (257 videos, │     │ (on CPU)     │     │              │
+│                 │     │  21,959       │     │              │     │              │
+└─────────────────┘     │  chunks)      │     └──────────────┘     └──────────────┘
+                         └──────────────┘
 ```
 
-## Safety notes
+| Layer | Technology |
+|-------|------|
+| Dashboard | FastAPI + Jinja (single file) |
+| Vector DB | ChromaDB (persisted) |
+| Embeddings | intfloat/multilingual-e5-large (CPU) |
+| LLM | ollama qwen3:0.6b (CPU) |
+| Audio | yt-dlp + Whisper (CUDA on GPU 0 — RTX A6000) |
+| State | SQLite registry |
+| Deployment | conda env + uvicorn |
 
-Never commit:
+**Hardware:**
+- GPU 0: NVIDIA RTX A6000 (49GB) — Whisper transcription only
+- CPU: AMD Ryzen 9 9950X — embedding model, Ollama inference, web app
 
-- `.env`
-- cookies
-- browser cookie exports
-- Chrome profile files
-- raw audio
-- raw transcripts
-- ChromaDB files
-- SQLite state DB
-- API keys
-- auth tokens
+---
 
-Generated data is intentionally ignored by Git.
-
-## Setup
-
-Create and activate the Conda environment:
+### ✦ Setup
 
 ```bash
+# Clone & enter
+git clone https://github.com/cbroker1/ask-veno.git
+cd ask-veno
+
+# Environment
 conda env create -f environment.yml
 conda activate ask-veno
+pip install -r requirements.txt
+
+# Ollama models needed
+ollama pull qwen3:0.6b
+
+# Start the dashboard
+python web_app.py
 ```
 
-Copy the example environment file:
+Then open `http://localhost:9876` in your browser.
 
-```bash
-cp .env.example .env
-```
+---
 
-Edit `.env` and set at minimum:
+### ✦ Quick Start
 
-```env
-# YouTube discovery
-YOUTUBE_CHANNEL_URL=https://www.youtube.com/@Venoxium/streams
-TITLE_FILTERS=ONE LIFE,1 LIFE
-MAX_DISCOVERY_VIDEOS=50
-MAX_NEW_VIDEOS=1
+1. **Browse** — The video archive table shows all ingested videos with status, chunk count, duration, and upload date.
+2. **Search** — Type any question in the search bar and hit Enter (or click SCAN).
+3. **Read** — The Gamma Analysis panel above the results gives you a direct, locally-generated answer.
+4. **Deep-link** — Click any result card to expand inline video playback at the exact timestamp where that snippet came from.
 
-# SQLite state
-SQLITE_DB_PATH=.state/youtube_ingest.sqlite
+---
 
-# Transcription queue
-MAX_TRANSCRIBE_VIDEOS=1
+### ✦ Key UI Details
 
-# faster-whisper on RTX A6000
-WHISPER_MODEL=large-v3
-WHISPER_DEVICE=cuda:0
-WHISPER_COMPUTE_TYPE=float16
-WHISPER_BATCH_SIZE=64
-WHISPER_BEAM_SIZE=10
-WHISPER_VAD_FILTER=true
-WHISPER_WORD_TIMESTAMPS=true
+- **Phosphor glow** — Each text element has a subtle `text-shadow` glow mimicking CRT phosphor excitation
+- **Scanlines** — CSS `linear-gradient` on a pseudo-element overlay creates horizontal scanline effect
+- **Progress rings** — Circular SVG/progress elements show pipeline completion at a glance
+- **Interactive cards** — Hover triggers amber glow transition; click expands inline video player
+- **Loading state** — Spinning nuclear ☢ loader during Ollama inference with fade-out on completion
+- **Responsive layout** — Grid-based stat panels collapse gracefully on narrower viewports
+- **No external fonts loaded at runtime** — Orbitron loaded once, then system fallbacks
 
-# Discovery metadata enrichment
-DISCOVERY_ENRICH_METADATA=true
-```
+---
 
-Initialize local state:
+### ✦ Pipeline Stats (current run)
 
-```bash
-python scripts/init_db.py
-python scripts/migrate_db.py
-```
+| Metric | Value |
+|-------|--------|
+| Videos ingested | 257 |
+| Total chunks | 21,959 |
+| Processing status | 100% complete |
+| Anomalies | 0 |
+| Embedding model | `intfloat/multilingual-e5-large` (CPU) |
+| Inference model | `qwen3:0.6b` (local Ollama, CPU) |
 
-## Run one pipeline pass
+---
 
-```bash
-python scripts/run_pipeline_once.py \
-  --max-discovery-videos 25 \
-  --max-new-videos 1 \
-  --max-transcribe-videos 1 \
-  --max-clean-videos 1 \
-  --max-embed-videos 1
-```
+### ✦ License
 
-## Query the indexed collection
+Private / personal project. All rights reserved.
 
-Retrieval only:
+---
 
-```bash
-python scripts/query_chromadb.py "What is the miracle machine?" --no-ollama
-```
-
-With Ollama inference:
-
-```bash
-python scripts/query_chromadb.py "What is the miracle machine?"
-```
-
-Use a specific Ollama model:
-
-```bash
-python scripts/query_chromadb.py \
-  "What is the miracle machine?" \
-  --ollama-model qwen3.5:0.8b
-```
-
-## Inspect pipeline state
-
-```bash
-sqlite3 .state/youtube_ingest.sqlite \
-"select video_id, ingest_status, audio_status, whisper_status, clean_transcript_status, embedding_status, chunk_count, last_error_type from videos;"
-```
-
-## Self-healing agent direction
-
-The deterministic pipeline now works. The next layer is Hermes Agent supervision.
-
-Example future repair loop:
-
-```text
-If yt-dlp fails with auth/cookie errors:
-  1. classify failure as failed_auth
-  2. retry with --cookies-from-browser chrome
-  3. if successful, save this as a reusable repair skill
-  4. if not successful, ask for manual browser login/cookie refresh
-```
-
-Potential Hermes skills:
-
-```text
-skills/
-  yt_dlp_auth_repair.md
-  pipeline_status_triage.md
-  failed_video_retry.md
-  chromadb_health_check.md
-```
-
-## MVP status
-
-Working end-to-end for at least one video:
-
-```text
-discover
-→ audio download
-→ Whisper transcription
-→ transcript cleanup
-→ ChromaDB embedding
-→ retrieval
-→ Ollama inference
-```
+*Designed with the Gamma PDA — because the best RAG interface is one that feels like it survived the Zone.*
