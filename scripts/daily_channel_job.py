@@ -1,18 +1,85 @@
 #!/usr/bin/env python3
 """
-Daily YouTube RAG channel job.
+daily_channel_job.py -- Daily YouTube RAG channel job.
 
 Behavior:
 1. Run exhaustive YouTube discovery.
 2. Detect whether brand-new videos were inserted into SQLite.
-3. If no new videos were found, exit quietly.
-4. If new videos were found, process the queue:
+3. If no new videos were found, exit quietly (exit code 0).
+4. If new videos were found, process the full queue:
    - download audio
    - Whisper transcription
    - transcript cleanup
    - ChromaDB embedding
+   - print final pipeline status
 
 This is intended to be run once per day by a systemd user timer.
+
+USAGE
+-----
+    python scripts/daily_channel_job.py
+
+OPTIONS
+    (none)  All configuration comes from environment variables or .env.
+
+EXAMPLES
+    # Run the daily job
+    python scripts/daily_channel_job.py
+
+    # Run with custom discovery limit
+    DAILY_DISCOVERY_MAX_VIDEOS=100 python scripts/daily_channel_job.py
+
+WHAT IT DOES
+------------
+1. Acquires a file lock (.state/daily_job.lock) to prevent concurrent runs.
+2. Records the start time and current video count.
+3. Runs discover_audio_candidates.py with exhaustive mode
+   (--max-discovery-vectors from DAILY_DISCOVERY_MAX_VIDEOS, default 0 = unlimited).
+4. Queries for new videos discovered since the start time.
+5. If no new videos: exits silently (exit code 0).
+6. If new videos found:
+   - Logs each new video (ID, upload date, title).
+   - Runs the full queue pipeline (download, whisper, clean, embed).
+   - Prints the final pipeline status.
+7. Releases the file lock on exit.
+
+ENVIRONMENT VARIABLES
+    SQLITE_DB_PATH                Database path (default: .state/youtube_ingest.sqlite)
+    DAILY_DISCOVERY_MAX_VIDEOS    Max videos for discovery (default: 0 = unlimited)
+    All variables accepted by the individual queue processor scripts
+    (discover_audio_candidates.py, process_audio_queue.py, etc.)
+
+EXIT CODES
+    0  No new videos or job completed successfully.
+    1  Discovery failed or a pipeline step failed.
+
+SYSTEMD TIMER EXAMPLE
+---------------------
+Create /etc/systemd/user/daily-rag.timer:
+
+    [Unit]
+    Description=Daily YouTube RAG job
+
+    [Timer]
+    OnCalendar=daily
+    Persistent=true
+
+    [Install]
+    WantedBy=timers.target
+
+Create /etc/systemd/user/daily-rag.service:
+
+    [Unit]
+    Description=Daily YouTube RAG job
+
+    [Service]
+    Type=oneshot
+    WorkingDirectory=/path/to/ask-veno
+    ExecStart=/path/to/.venv/bin/python scripts/daily_channel_job.py
+
+Enable with:
+    systemctl --user enable --now daily-rag.timer
+
 """
 
 from __future__ import annotations

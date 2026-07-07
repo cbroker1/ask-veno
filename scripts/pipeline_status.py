@@ -1,6 +1,46 @@
 #!/usr/bin/env python3
 """
-Show the current YouTube RAG pipeline status from SQLite.
+pipeline_status.py -- Show the current YouTube RAG pipeline status from SQLite.
+
+Displays:
+- Counts by ingest_status, audio_status, whisper_status, clean_transcript_status,
+  embedding_status (grouped status tables).
+- Recent videos (last N by discovered_at) with all status columns.
+- Failed videos (any with last_error_type set or ingest_status starting with 'failed').
+
+USAGE
+-----
+    python scripts/pipeline_status.py
+
+OPTIONS
+    --db-path PATH        SQLite database path
+                          (default: .state/youtube_ingest.sqlite)
+    --limit N             Number of recent videos to show (default: 20)
+
+EXAMPLES
+    # Show default status overview
+    python scripts/pipeline_status.py
+
+    # Show last 50 recent videos
+    python scripts/pipeline_status.py --limit 50
+
+    # Use a custom database
+    python scripts/pipeline_status.py --db-path /path/to/db.sqlite
+
+WHAT IT DISPLAYS
+----------------
+1. Counts by status -- for each of the 5 status columns, shows how many
+   videos are in each state (e.g., how many are 'queued', 'downloaded', etc.).
+2. Recent videos -- the N most recently discovered videos with all status
+   columns and chunk count.
+3. Failures -- all videos with errors, showing the error type and message.
+
+ENVIRONMENT VARIABLES
+    SQLITE_DB_PATH    Database path (default: .state/youtube_ingest.sqlite)
+
+EXIT CODES
+    0  Status displayed successfully.
+    2  Startup error (config or DB failure).
 """
 
 from __future__ import annotations

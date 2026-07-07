@@ -1,30 +1,83 @@
 #!/usr/bin/env python3
 """
-Process audio files through faster-whisper.
+process_whisper_queue.py -- Transcribe downloaded audio files using faster-whisper.
 
-This script is based on the original notebook workflow:
+This script is based on the original notebook workflow. It loads the Whisper
+model once, then processes queued audio files in order.
 
-- Load Whisper once
-- Use word_timestamps=True
-- Write transcript JSON into the same folder as the MP3
-- Name the transcript after the folder:
-    <folder_name> transcript.json
+- Load Whisper once (supports batched inference for throughput).
+- Use word_timestamps=True for per-word timing.
+- Write transcript JSON into the same folder as the MP3.
+- Name the transcript after the folder: <folder_name> transcript.json.
 
 SQLite-state driven:
 
-- Select audio_ready videos with audio_status=downloaded
-- Skip videos already transcribed
-- Update whisper_status and transcript_path
+- Select videos with ingest_status='audio_ready' and audio_status='downloaded'.
+- Skip videos already transcribed (whisper_status='transcribed').
+- Update whisper_status and transcript_path on success.
 
-Expected .env values:
+USAGE
+-----
+    python scripts/process_whisper_queue.py
 
-    WHISPER_MODEL=large-v3
-    WHISPER_DEVICE=cuda:0
-    WHISPER_COMPUTE_TYPE=float16
-    WHISPER_BATCH_SIZE=8
-    WHISPER_BEAM_SIZE=5
-    WHISPER_VAD_FILTER=true
-    WHISPER_WORD_TIMESTAMPS=true
+OPTIONS
+    --db-path PATH                    SQLite database path
+                                      (default: .state/youtube_ingest.sqlite)
+    --max-transcribe-videos N         Number of videos to transcribe per run
+                                      (default: 1)
+    --whisper-model NAME              Whisper model name (default: large-v3)
+    --whisper-device DEVICE           Device: cuda:0, cuda, or cpu
+                                      (default: cuda:0)
+    --whisper-compute-type TYPE       float16, float32, int8, int8_float16, etc.
+                                      (default: float16)
+    --whisper-batch-size N            Batch size for batched inference (default: 8)
+    --whisper-beam-size N             Beam search width (default: 5)
+    --whisper-vad-filter true|false   Enable voice activity detection filter
+                                      (default: true)
+    --word-timestamps true|false      Enable per-word timestamps (default: true)
+    --dry-run                         Print queue and exit without transcribing
+
+EXAMPLES
+    # Transcribe 1 video with defaults
+    python scripts/process_whisper_queue.py
+
+    # Transcribe 5 videos using a smaller model on CPU
+    python scripts/process_whisper_queue.py \
+        --max-transcribe-videos 5 \
+        --whisper-model base.en \
+        --whisper-device cpu
+
+    # Dry run to see what would be transcribed
+    python scripts/process_whisper_queue.py --dry-run
+
+WHAT IT DOES
+------------
+1. Queries the database for audio_ready videos with audio_status='downloaded'
+   and whisper_status != 'transcribed'.
+2. Loads the faster-whisper model (single instance, reused for all videos).
+3. For each video:
+   - Checks if the audio file exists.
+   - Skips if a transcript JSON already exists (idempotent).
+   - Runs transcribe() with beam search and optional VAD filter.
+   - Writes transcript JSON (segments, text, language info, config).
+   - Marks the video as transcribed in the database.
+4. Handles failures by recording error type and message.
+
+ENVIRONMENT VARIABLES
+    SQLITE_DB_PATH                Database path (default: .state/youtube_ingest.sqlite)
+    MAX_TRANSCRIBE_VIDEOS         Max videos per run (default: 1)
+    WHISPER_MODEL                 Whisper model (default: large-v3)
+    WHISPER_DEVICE                Device string (default: cuda:0)
+    WHISPER_COMPUTE_TYPE          Compute type (default: float16)
+    WHISPER_BATCH_SIZE            Batch size (default: 8)
+    WHISPER_BEAM_SIZE             Beam size (default: 5)
+    WHISPER_VAD_FILTER            VAD filter (default: true)
+    WHISPER_WORD_TIMESTAMPS       Word timestamps (default: true)
+
+EXIT CODES
+    0  Transcription completed (all or no videos).
+    1  One or more videos failed transcription.
+    2  Startup error (config, DB, or model loading failure).
 """
 
 from __future__ import annotations

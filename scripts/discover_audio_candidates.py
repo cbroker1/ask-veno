@@ -1,18 +1,90 @@
 #!/usr/bin/env python3
 """
-Discover YouTube audio candidates and persist them into SQLite.
+discover_audio_candidates.py -- Discover YouTube videos from a channel or
+playlist and persist matching candidates into SQLite.
 
 Workflow:
 
-- Use yt-dlp with extract_flat=True for fast channel / streams discovery
-- Scan a channel / streams URL
-- Match videos by title substring
-- Enrich only the matched videos with full metadata so fields like upload_date are populated
-- Save video_id/title/url/upload_date/duration into a persistent SQLite registry
+1. Use yt-dlp with extract_flat=True for fast channel / streams discovery.
+2. Scan the channel or playlist URL.
+3. Match videos by title substring (case-insensitive).
+4. Enrich only the matched videos with full metadata (upload_date, duration).
+5. Save video_id, title, url, upload_date, duration into a persistent SQLite
+   registry.
 
 It does NOT download audio.
 It does NOT run Whisper.
 It does NOT embed anything into ChromaDB.
+
+USAGE
+-----
+    python scripts/discover_audio_candidates.py \
+        --channel-url "https://www.youtube.com/@Venoxium/streams" \
+        --title-filters "ONE LIFE,1 LIFE"
+
+OPTIONS
+    --channel-url URL             YouTube channel or playlist URL (required)
+    --title-filters FILTERS       Comma-separated substrings to match in
+                                  video titles (required, e.g. "ONE LIFE,1 LIFE")
+    --db-path PATH                SQLite database path (default: .state/youtube_ingest.sqlite)
+    --max-discovery-videos N      Limit discovery to N videos from the channel
+                                  (default: unlimited)
+    --browser BROWSER             Browser to use for cookies (chrome, firefox, etc.)
+                                  (default: chrome)
+    --cookies-txt-path PATH       Path to cookies.txt file for yt-dlp
+    --use-browser-cookies true|false  Use browser cookies for authentication
+                                      (default: true)
+    --use-cookies-txt-fallback true|false  Fall back to cookies.txt if browser
+                                           cookies fail (default: false)
+    --enrich-metadata true|false      Fetch full metadata for matched videos
+                                      (default: true)
+    --dry-run                     Discover and match without writing to the database
+
+EXAMPLES
+    # Discover and persist matching videos from a channel
+    python scripts/discover_audio_candidates.py \
+        --channel-url "https://www.youtube.com/@Venoxium/streams" \
+        --title-filters "ONE LIFE,1 LIFE"
+
+    # Dry run to preview matches without database writes
+    python scripts/discover_audio_candidates.py \
+        --channel-url "https://www.youtube.com/@Venoxium/streams" \
+        --title-filters "ONE LIFE" \
+        --dry-run
+
+    # Limit to 50 videos and disable metadata enrichment
+    python scripts/discover_audio_candidates.py \
+        --channel-url "https://www.youtube.com/@Venoxium/streams" \
+        --title-filters "ONE LIFE" \
+        --max-discovery-videos 50 \
+        --enrich-metadata false
+
+WHAT IT DOES
+------------
+1. Runs yt-dlp with extract_flat=True on the channel/playlist URL.
+2. Filters entries by matching title substrings (case-insensitive).
+3. Optionally enriches matched videos with full metadata by calling yt-dlp
+   individually on each match (avoids pulling metadata for every channel item).
+4. Upserts matched videos into the videos table:
+   - New videos are inserted with ingest_status='queued'.
+   - Existing videos are updated with fresh title/url/upload_date/duration.
+5. Records a run entry in the runs table with summary statistics.
+
+ENVIRONMENT VARIABLES
+    YOUTUBE_CHANNEL_URL           Channel URL (required if --channel-url not set)
+    TITLE_FILTERS                 Comma-separated title filters (required if --title-filters not set)
+    SQLITE_DB_PATH                Database path (default: .state/youtube_ingest.sqlite)
+    MAX_DISCOVERY_VIDEOS          Max videos to discover (default: unlimited)
+    USE_BROWSER_COOKIES           Use browser cookies (default: true)
+    YTDLP_BROWSER                 Browser for cookies (default: chrome)
+    USE_COOKIES_TXT_FALLBACK      Use cookies.txt fallback (default: false)
+    COOKIES_TXT_PATH              Path to cookies.txt (default: cookies.txt)
+    DISCOVERY_ENRICH_METADATA     Enable metadata enrichment (default: true)
+
+EXIT CODES
+    0  Discovery completed successfully.
+    1  Discovery or database update failed.
+    2  Configuration error (missing required values).
 """
 
 from __future__ import annotations

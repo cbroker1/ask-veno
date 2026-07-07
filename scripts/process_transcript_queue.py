@@ -1,23 +1,67 @@
 #!/usr/bin/env python3
 """
-Clean raw Whisper transcript JSON into a simplified transcript_clean.json file.
+process_transcript_queue.py -- Clean raw Whisper transcript JSON into a
+simplified transcript_clean.json file.
 
 This script is based on the existing transcript post-processing notebook.
 
 Input:
-  <folder_name> transcript.json
+  <folder_name> transcript.json   (raw Whisper output with segments, tokens, etc.)
 
 Output:
-  <folder_name> transcript_clean.json
+  <folder_name> transcript_clean.json   (cleaned segments: start, end, text only)
 
 Each cleaned segment keeps:
-  - start
-  - end
-  - text
+  - start    (float, seconds)
+  - end      (float, seconds)
+  - text     (stripped whitespace, single-line)
 
 The script is SQLite-state driven:
-  transcript_ready + transcribed + not cleaned
-    -> transcript_clean_ready + cleaned
+  ingest_status='transcript_ready' + whisper_status='transcribed' + clean_transcript_status != 'cleaned'
+    -> ingest_status='transcript_clean_ready' + clean_transcript_status='cleaned'
+
+USAGE
+-----
+    python scripts/process_transcript_queue.py
+
+OPTIONS
+    --db-path PATH                SQLite database path
+                                  (default: .state/youtube_ingest.sqlite)
+    --max-clean-videos N          Number of transcripts to clean per run
+                                  (default: 1)
+    --dry-run                     Print queue and exit without cleaning
+
+EXAMPLES
+    # Clean 1 transcript with defaults
+    python scripts/process_transcript_queue.py
+
+    # Clean 3 transcripts
+    python scripts/process_transcript_queue.py --max-clean-videos 3
+
+    # Dry run to see what would be cleaned
+    python scripts/process_transcript_queue.py --dry-run
+
+WHAT IT DOES
+------------
+1. Queries the database for transcript_ready videos with whisper_status='transcribed'
+   and clean_transcript_status != 'cleaned'.
+2. For each video:
+   - Reads the raw transcript JSON.
+   - Cleans each segment: strips whitespace, removes empty/null text,
+     drops segments missing start/end times.
+   - Sorts segments by start time.
+   - Writes transcript_clean.json (list of {start, end, text} dicts).
+   - Marks the video as cleaned in the database.
+3. Handles failures by recording error type and message.
+
+ENVIRONMENT VARIABLES
+    SQLITE_DB_PATH            Database path (default: .state/youtube_ingest.sqlite)
+    MAX_CLEAN_TRANSCRIPTS     Max transcripts per run (default: 1)
+
+EXIT CODES
+    0  Cleanup completed (all or no videos).
+    1  One or more videos failed cleanup.
+    2  Startup error (config or DB failure).
 """
 
 from __future__ import annotations

@@ -1,9 +1,41 @@
 #!/usr/bin/env python3
 """
-Apply lightweight SQLite schema migrations.
+migrate_db.py -- Apply lightweight SQLite schema migrations.
 
 This keeps an existing local .state/youtube_ingest.sqlite database compatible
-as the repo evolves.
+as the repo evolves. It adds missing columns using ALTER TABLE ADD COLUMN,
+skipping columns that already exist.
+
+USAGE
+-----
+    python scripts/migrate_db.py
+
+OPTIONS
+    (none)  The script applies all known migrations and exits.
+            Set SQLITE_DB_PATH in .env or environment to change the path.
+
+EXAMPLES
+    # Migrate the default database
+    python scripts/migrate_db.py
+
+    # Migrate a custom database
+    SQLITE_DB_PATH=/path/to/db.sqlite python scripts/migrate_db.py
+
+MIGRATIONS APPLIED
+------------------
+The following columns are added to the videos table if missing:
+
+    clean_transcript_status   TEXT NOT NULL DEFAULT 'not_started'
+    clean_transcript_path     TEXT
+    chunk_count               INTEGER NOT NULL DEFAULT 0
+    embedded_at               TEXT
+
+ENVIRONMENT VARIABLES
+    SQLITE_DB_PATH    Database path (default: .state/youtube_ingest.sqlite)
+
+EXIT CODES
+    0  Migration completed successfully.
+    1  Database does not exist yet (run init_db.py first).
 """
 
 from __future__ import annotations

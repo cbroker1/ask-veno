@@ -1,22 +1,84 @@
 #!/usr/bin/env python3
 """
-Embed cleaned transcript chunks into ChromaDB.
+process_chromadb_queue.py -- Embed cleaned transcript chunks into ChromaDB.
 
 This script is based on the existing Chroma notebook workflow:
 
-- Load transcript_clean.json
-- Chunk by tokenizer token count
-- Preserve overlap
-- Create youtube_time_url at each chunk start time
-- Embed with intfloat/multilingual-e5-large
-- Store chunks in a persistent ChromaDB collection
+- Load transcript_clean.json.
+- Chunk by tokenizer token count (preserving overlap).
+- Create youtube_time_url at each chunk start time.
+- Embed with intfloat/multilingual-e5-large (E5-style passage prefix).
+- Store chunks in a persistent ChromaDB collection.
 
 Unlike the notebook, this script is SQLite-state driven:
 
-  transcript_clean_ready + cleaned
-    -> ChromaDB chunks
-    -> embedding_status = embedded
-    -> ingest_status = complete
+  ingest_status='transcript_clean_ready' + clean_transcript_status='cleaned'
+    -> ChromaDB chunks created
+    -> embedding_status = 'embedded'
+    -> ingest_status = 'complete'
+
+USAGE
+-----
+    python scripts/process_chromadb_queue.py
+
+OPTIONS
+    --db-path PATH                SQLite database path
+                                  (default: .state/youtube_ingest.sqlite)
+    --chroma-path PATH            ChromaDB persistent directory
+                                  (default: data/chroma)
+    --collection-name NAME        ChromaDB collection name
+                                  (default: youtube_chunks)
+    --embed-model-name NAME       Sentence-transformers model name
+                                  (default: intfloat/multilingual-e5-large)
+    --max-embed-videos N          Number of videos to embed per run
+                                  (default: 1)
+    --chunk-max-tokens N          Max tokens per chunk (default: 512)
+    --chunk-overlap F             Overlap ratio between chunks (0.0-1.0)
+                                  (default: 0.25)
+    --embed-batch-size N          Embedding batch size (default: 32)
+    --dry-run                     Print queue and exit without embedding
+
+EXAMPLES
+    # Embed 1 video with defaults
+    python scripts/process_chromadb_queue.py
+
+    # Embed 3 videos with custom chunk size
+    python scripts/process_chromadb_queue.py \
+        --max-embed-videos 3 \
+        --chunk-max-tokens 256
+
+    # Dry run to see what would be embedded
+    python scripts/process_chromadb_queue.py --dry-run
+
+WHAT IT DOES
+------------
+1. Queries the database for transcript_clean_ready videos with
+   clean_transcript_status='cleaned' and embedding_status != 'embedded'.
+2. For each video:
+   - Loads the clean transcript JSON.
+   - Chunks the transcript using the configured tokenizer (E5-style).
+   - Builds metadata for each chunk: youtube_time_url, video_title,
+     video_id, start/end times (seconds and HMS), source folder, etc.
+   - Skips chunks already in ChromaDB (idempotent).
+   - Embeds new chunks with "passage: " prefix (E5 convention).
+   - Adds chunks to the ChromaDB collection.
+   - Marks the video as embedded in the database.
+3. Handles failures by recording error type and message.
+
+ENVIRONMENT VARIABLES
+    SQLITE_DB_PATH            Database path (default: .state/youtube_ingest.sqlite)
+    CHROMA_PATH               ChromaDB path (default: data/chroma)
+    CHROMA_COLLECTION         Collection name (default: youtube_chunks)
+    EMBED_MODEL_NAME          Embedding model (default: intfloat/multilingual-e5-large)
+    MAX_EMBED_VIDEOS          Max videos per run (default: 1)
+    CHUNK_MAX_TOKENS          Max tokens per chunk (default: 512)
+    CHUNK_OVERLAP             Overlap ratio (default: 0.25)
+    EMBED_BATCH_SIZE          Embedding batch size (default: 32)
+
+EXIT CODES
+    0  Embedding completed (all or no videos).
+    1  One or more videos failed embedding.
+    2  Startup error (config or DB failure).
 """
 
 from __future__ import annotations

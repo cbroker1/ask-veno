@@ -1,19 +1,86 @@
 #!/usr/bin/env python3
 """
-Process queued YouTube videos by downloading audio only.
+process_audio_queue.py -- Download audio from queued YouTube videos.
 
 This script mirrors the useful parts of the original notebook:
 
-- Select videos already discovered into SQLite
-- Fetch full metadata only for selected queued videos
-- Create a local folder using upload_date + title + video_id
-- Download audio as MP3
-- Save youtube_url_<video_id>.txt
-- Save video_metadata_<video_id>.json
-- Update SQLite with local_dir, audio_path, upload_date, and status
+- Select videos already discovered into SQLite.
+- Fetch full metadata only for selected queued videos (fast, avoids pulling
+  metadata for every channel item).
+- Create a local folder using upload_date + title + video_id.
+- Download audio as MP3 (or configured format).
+- Save youtube_url_<video_id>.txt with the video URL.
+- Save video_metadata_<video_id>.json with enriched metadata.
+- Update SQLite with local_dir, audio_path, upload_date, and status.
 
 It does not run Whisper.
 It does not create ChromaDB embeddings.
+
+USAGE
+-----
+    python scripts/process_audio_queue.py
+
+OPTIONS
+    --db-path PATH                    SQLite database path
+                                      (default: .state/youtube_ingest.sqlite)
+    --audio-root PATH                 Root directory for downloaded audio
+                                      (default: data/raw/youtube)
+    --max-new-videos N                Number of videos to process per run
+                                      (default: 1)
+    --audio-format FORMAT             Audio format: mp3, m4a, etc.
+                                      (default: mp3)
+    --browser BROWSER                 Browser for cookies (chrome, firefox, etc.)
+                                      (default: chrome)
+    --cookies-txt-path PATH           Path to cookies.txt file
+    --use-browser-cookies true|false  Use browser cookies for authentication
+                                      (default: false)
+    --use-cookies-txt-fallback true|false  Fall back to cookies.txt if browser
+                                           cookies fail (default: false)
+    --dry-run                         Print queue and exit without downloading
+
+EXAMPLES
+    # Download 1 queued video with defaults
+    python scripts/process_audio_queue.py
+
+    # Download 3 videos using m4a format and browser cookies
+    python scripts/process_audio_queue.py \
+        --max-new-videos 3 \
+        --audio-format m4a \
+        --use-browser-cookies true
+
+    # Dry run to see what would be downloaded
+    python scripts/process_audio_queue.py --dry-run
+
+WHAT IT DOES
+------------
+1. Queries the database for videos with ingest_status in
+   ('queued', 'failed_ytdlp', 'failed_network', 'failed_auth') and
+   audio_status != 'downloaded'.
+2. For each video:
+   - Fetches full metadata via yt-dlp (tries cookie modes: none, browser, cookies_txt).
+   - Creates a local folder: <audio_root>/<upload_date>_<title>_<video_id>.
+   - Downloads audio using yt-dlp (tries cookie modes sequentially).
+   - Writes sidecar files: youtube_url_<id>.txt, video_metadata_<id>.json.
+   - Updates the video row: ingest_status='audio_ready', audio_status='downloaded'.
+3. Classifies errors (auth, network, ffmpeg) for targeted retry logic.
+4. Handles failures by recording error type and message.
+
+ENVIRONMENT VARIABLES
+    SQLITE_DB_PATH                Database path (default: .state/youtube_ingest.sqlite)
+    YOUTUBE_AUDIO_ROOT            Audio root directory (default: data/raw/youtube)
+    MAX_NEW_VIDEOS                Max videos per run (default: 1)
+    AUDIO_FORMAT                  Audio format (default: mp3)
+    USE_BROWSER_COOKIES           Use browser cookies (default: false)
+    YTDLP_BROWSER                 Browser for cookies (default: chrome)
+    USE_COOKIES_TXT_FALLBACK      Use cookies.txt fallback (default: false)
+    COOKIES_TXT_PATH              Path to cookies.txt (default: cookies.txt)
+    YTDLP_USE_DENO                Use Deno for yt-dlp JS runtime (default: false)
+    YTDLP_DENO_PATH               Path to Deno binary
+
+EXIT CODES
+    0  Download completed (all or no videos).
+    1  One or more videos failed download.
+    2  Startup error (config or DB failure).
 """
 
 from __future__ import annotations

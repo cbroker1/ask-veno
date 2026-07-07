@@ -1,16 +1,75 @@
 #!/usr/bin/env python3
 """
-Run one pass of the local YouTube RAG pipeline.
+run_pipeline_once.py -- Run one pass of the local YouTube RAG pipeline.
 
-This advances each queue stage by a small number of items:
+This advances each queue stage by a small number of items, in order:
 
-1. Discover audio candidates
-2. Download audio
-3. Transcribe audio with Whisper
-4. Clean transcript
-5. Embed into ChromaDB
+1. Discover audio candidates (scan channel for new matching videos)
+2. Download audio (yt-dlp audio extraction)
+3. Transcribe audio with Whisper (faster-whisper)
+4. Clean transcript (strip raw Whisper artifacts)
+5. Embed into ChromaDB (vector store)
 
 This does not query Ollama. Use scripts/query_chromadb.py for inference testing.
+
+USAGE
+-----
+    python scripts/run_pipeline_once.py
+
+OPTIONS
+    --max-discovery-videos N    Max videos to discover per run (default: 25)
+    --max-new-videos N          Max videos to download per run (default: 1)
+    --max-transcribe-videos N   Max videos to transcribe per run (default: 1)
+    --max-clean-videos N        Max transcripts to clean per run (default: 1)
+    --max-embed-videos N        Max videos to embed per run (default: 1)
+    --skip-discovery            Skip the discovery step
+    --skip-download             Skip the audio download step
+    --skip-whisper              Skip the Whisper transcription step
+    --skip-clean                Skip the transcript cleanup step
+    --skip-embed                Skip the ChromaDB embedding step
+    --use-browser-cookies true|false  Use browser cookies for audio download
+                                      (default: false)
+
+EXAMPLES
+    # Run all steps with defaults
+    python scripts/run_pipeline_once.py
+
+    # Run only discovery and download
+    python scripts/run_pipeline_once.py --skip-whisper --skip-clean --skip-embed
+
+    # Run all steps but process 5 videos per stage
+    python scripts/run_pipeline_once.py \
+        --max-discovery-videos 50 \
+        --max-new-videos 5 \
+        --max-transcribe-videos 5 \
+        --max-clean-videos 5 \
+        --max-embed-videos 5
+
+    # Run only Whisper transcription
+    python scripts/run_pipeline_once.py \
+        --skip-discovery --skip-download --skip-clean --skip-embed
+
+WHAT IT DOES
+------------
+This script is a pipeline orchestrator. It runs each step sequentially,
+passing control to the corresponding queue processor script:
+
+    discover_audio_candidates.py  -> download_audio_candidates.py
+    process_audio_queue.py        -> process_audio_queue.py
+    process_whisper_queue.py      -> process_whisper_queue.py
+    process_transcript_queue.py   -> process_transcript_queue.py
+    process_chromadb_queue.py     -> process_chromadb_queue.py
+
+If any required step fails, the pipeline stops and returns exit code 1.
+Optional steps (marked with --skip-*) are skipped entirely.
+
+ENVIRONMENT VARIABLES
+    All environment variables accepted by the individual queue processor
+    scripts are also valid here (e.g., SQLITE_DB_PATH, WHISPER_MODEL, etc.).
+
+EXIT CODES
+    0  All selected steps completed successfully.
+    1  A required step failed.
 """
 
 from __future__ import annotations

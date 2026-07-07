@@ -1,15 +1,68 @@
 #!/usr/bin/env python3
 """
-Query the local ChromaDB YouTube transcript collection and optionally send
-retrieved context to Ollama.
+query_chromadb.py -- Query the local ChromaDB YouTube transcript collection
+and optionally send retrieved context to Ollama for an answer.
 
-This script is based on the original inference notebook:
+This script is based on the original inference notebook. It embeds a user
+query, retrieves the top-k chunks from ChromaDB, filters out likely
+sponsor/promo/outro segments, and optionally sends the remaining context
+to a local Ollama instance for answer generation.
 
-- Embed query with E5 query prefix
-- Retrieve top-k ChromaDB chunks
-- Filter likely sponsor/promo/outro chunks
-- Send retrieved transcript excerpts to Ollama
-- Print answer and source references
+USAGE
+-----
+    python scripts/query_chromadb.py "your question here"
+
+OPTIONS
+    --chroma-path PATH          Path to the ChromaDB persistent directory
+                                (default: data/chroma)
+    --collection-name NAME      ChromaDB collection name (default: youtube_chunks)
+    --embed-model-name NAME     Sentence-transformers model to use for
+                                embedding (default: intfloat/multilingual-e5-large)
+    --top-k N                   Number of chunks to retrieve (default: 8)
+    --ollama-server HOST        Ollama server hostname (default: localhost)
+    --ollama-model NAME         Ollama model name (default: qwen3:0.6b)
+    --no-ollama                 Retrieve and print sources only; skip
+                                Ollama answer generation
+    --show-context              Print the full retrieved transcript excerpts
+
+EXAMPLES
+    # Ask a question and get an answer from Ollama
+    python scripts/query_chromadb.py "What are the best late-game artifacts?"
+
+    # Retrieve sources only (no Ollama)
+    python scripts/query_chromadb.py --no-ollama "What is Venoxium?"
+
+    # Show retrieved context alongside sources
+    python scripts/query_chromadb.py --no-ollama --show-context "How does the pipeline work?"
+
+    # Use a custom embedding model and top-k
+    python scripts/query_chromadb.py --top-k 16 --embed-model-name "intfloat/multilingual-e5-large" "Question?"
+
+WHAT IT DOES
+------------
+1. Embeds the query using the configured sentence-transformers model (with
+   a "query: " prefix for E5-style models).
+2. Queries ChromaDB for the top-k most similar chunks.
+3. Filters out chunks likely to be sponsor/promo/outro content (scored by
+   keywords like "subscribe", "sponsor", "patreon", "merch", etc.).
+4. Displays a source reference table with video title, timestamp, and link.
+5. If --show-context is set, prints the raw transcript excerpts.
+6. If --no-ollama is not set, sends the filtered context to Ollama for
+   answer generation and prints the result.
+
+ENVIRONMENT VARIABLES
+    CHROMA_PATH               Path to ChromaDB data (default: data/chroma)
+    CHROMA_COLLECTION         Collection name (default: youtube_chunks)
+    EMBED_MODEL_NAME          Embedding model name (default: intfloat/multilingual-e5-large)
+    RETRIEVAL_TOP_K           Number of chunks to retrieve (default: 8)
+    OLLAMA_SERVER             Ollama host (default: localhost)
+    OLLAMA_MODEL              Ollama model (default: qwen3:0.6b)
+    OLLAMA_TIMEOUT_SECONDS    Ollama request timeout in seconds (default: 300)
+    QWEN_MODEL                Fallback Ollama model if OLLAMA_MODEL is unset
+
+EXIT CODES
+    0  Query completed successfully.
+    1  An error occurred.
 """
 
 from __future__ import annotations
