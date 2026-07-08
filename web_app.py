@@ -103,7 +103,7 @@ def get_videos(limit=20):
             "dt": date_fmt(r["upload_date"])})
     return out
 
-def search_qb(query, top_k=8):
+def search_qb(query, top_k=5):
     cb = get_chroma_path()
     if not cb.exists(): raise HTTPException(500, "ChromaDB not found")
     model = get_embedding_model()
@@ -456,7 +456,7 @@ async def search(request: Request, query: str = Form(...)):
     error_msg = ""
     t0 = _time.perf_counter()
     try:
-        search_res = search_qb(query, 8)
+        search_res = search_qb(query, 5)
     except Exception as e:
         search_res = {"chunks": [], "summary": ""}
         error_msg = str(e)
@@ -477,7 +477,7 @@ async def api_stats(): return get_video_stats()
 @app.get("/api/videos")
 async def api_videos(limit: int = 20): return get_videos(limit)
 @app.post("/api/search")
-async def api_search(query: str = Form(...), top_k: int = Form(8)):
+async def api_search(query: str = Form(...), top_k: int = Form(5)):
     return search_qb(query, top_k=top_k)
 
 

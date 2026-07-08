@@ -18,7 +18,7 @@ OPTIONS
     --collection-name NAME      ChromaDB collection name (default: youtube_chunks)
     --embed-model-name NAME     Sentence-transformers model to use for
                                 embedding (default: intfloat/multilingual-e5-large)
-    --top-k N                   Number of chunks to retrieve (default: 8)
+    --top-k N                   Number of chunks to retrieve (default: 5)
     --ollama-server HOST        Ollama server hostname (default: localhost)
     --ollama-model NAME         Ollama model name (default: qwen3:0.6b)
     --no-ollama                 Retrieve and print sources only; skip
