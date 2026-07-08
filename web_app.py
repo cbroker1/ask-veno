@@ -340,7 +340,8 @@ def _report_html(chunks, summary: str, error: str) -> str:
                     '<span class="summary-label">⌁ FIELD REPORT</span>'
                     '<span class="summary-src">SYNTH: qwen3:0.6b · LOCAL</span></div>'
                     f'<div class="summary-response">{cleaned}</div>'
-                    f'<div class="summary-note">Synthesized from {n} matched segment{"s" if n != 1 else ""} by a local LLM — verify against the stream evidence below.</div>'
+                    f'<div class="summary-note">Synthesized from {n} matched segment{"s" if n != 1 else ""} by a local LLM — verify against the stream evidence below:</div>'
+                    f'{_sources_html(chunks)}'
                     '</div>')
     if chunks:
         return ('<div class="offline-card panel"><span class="offline-dot"></span>'
@@ -348,16 +349,16 @@ def _report_html(chunks, summary: str, error: str) -> str:
     return ""
 
 
-def _sources_html(chunks, has_summary: bool) -> str:
-    if not (chunks and has_summary):
+def _sources_html(chunks) -> str:
+    """Single-column source list embedded in the field report card."""
+    if not chunks:
         return ""
-    h = '<div class="sources-strip"><span class="sources-label">REPORT SOURCES ▸</span>'
+    h = '<div class="sources-col">'
     for i, c in enumerate(chunks, 1):
         title = c["vt"] or "Unknown"
-        short = esc(title[:52] + ("…" if len(title) > 52 else ""))
         h += (f'<button type="button" class="src-chip" data-target="ev-{i}" '
               f'title="Jump to evidence [{i:02d}] — {esc(title)}">'
-              f'<span class="src-n">{i:02d}</span> {esc(c["s"])} · {short}</button>')
+              f'<span class="src-n">{i:02d}</span> {esc(c["s"])} · {esc(title)}</button>')
     h += "</div>"
     return h
 
@@ -389,7 +390,6 @@ def _render_page(query: str = "", chunks=None, summary: str = "", error: str = "
         q_attr=esc(query),
         echo_html=_echo_html(query, chunks, scan_s) if searched else "",
         report_html=_report_html(chunks, summary, error) if searched else "",
-        sources_html=_sources_html(chunks, bool(summary and _clean_summary(summary))) if searched else "",
         results_html=_results(chunks, searched),
         # archive
         video_rows=_rows(videos),
@@ -575,7 +575,7 @@ body::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;border:2p
 .echo-new:hover{border-color:var(--amber);text-shadow:none}
 
 /* ── field report / fault / offline ── */
-.summary-card{border-left:3px solid var(--green);padding:18px 20px;margin-bottom:14px}
+.summary-card{border-left:3px solid var(--green);padding:18px 20px;margin-bottom:22px}
 .summary-card.corners::before{border-color:var(--green)}
 .summary-card.corners::after{border-color:var(--green)}
 .summary-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
@@ -590,12 +590,11 @@ body::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;border:2p
 .offline-card{display:flex;align-items:center;gap:10px;border-left:3px solid var(--amber);padding:13px 18px;margin-bottom:18px;font-size:.78rem;color:#b0a548;letter-spacing:.05em}
 .offline-dot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px rgba(212,168,41,.6);flex:none;animation:led-pulse 1.8s ease-in-out infinite}
 
-/* ── report sources strip ── */
-.sources-strip{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:22px}
-.sources-label{font-size:.62rem;color:var(--faint);letter-spacing:.18em}
-.src-chip{font-family:'Share Tech Mono',monospace;font-size:.7rem;color:#b0a548;background:#0c0a05;border:1px solid var(--line2);border-radius:2px;padding:5px 10px;cursor:pointer;transition:all .15s;max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ── report sources (single column inside the field report) ── */
+.sources-col{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.src-chip{font-family:'Share Tech Mono',monospace;font-size:.72rem;color:#b0a548;background:#0c0a05;border:1px solid var(--line2);border-radius:2px;padding:6px 11px;cursor:pointer;transition:all .15s;width:100%;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .src-chip:hover{border-color:var(--green);color:#cde0a0;box-shadow:0 0 10px rgba(64,224,64,.1)}
-.src-n{color:var(--green);margin-right:2px}
+.src-n{color:var(--green);margin-right:4px}
 
 /* ── evidence cards ── */
 .sec-title{font-family:'Orbitron',sans-serif;font-size:.9rem;letter-spacing:.12em;color:#b0a548;text-transform:uppercase;margin:4px 0 14px}
@@ -770,7 +769,6 @@ td{padding:10px 16px;color:#b0a548}
 
 {{echo_html}}
 {{report_html}}
-{{sources_html}}
 {{results_html}}
 
 <section class="telemetry">
