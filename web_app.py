@@ -369,6 +369,9 @@ def _render_page(query: str = "", chunks=None, summary: str = "", error: str = "
     chunks = chunks or []
     stats = get_video_stats()
     videos = get_videos(1000)
+    # display order: most recent stream first (upload_date is YYYYMMDD; blanks last,
+    # discovered_at order preserved as tiebreak by the stable sort)
+    videos.sort(key=lambda v: v.get("upload_date") or "", reverse=True)
     total = stats["total"]
 
     ctx = dict(
@@ -688,8 +691,7 @@ td{padding:10px 16px;color:#b0a548}
 .scan-box::before{top:-1px;left:-1px;border-top:2px solid var(--amber);border-left:2px solid var(--amber)}
 .scan-box::after{bottom:-1px;right:-1px;border-bottom:2px solid var(--amber);border-right:2px solid var(--amber)}
 .scan-top{display:flex;align-items:center;gap:16px;margin-bottom:16px}
-.scan-ring{width:56px;height:56px;flex:none;border-radius:50%;border:2px dashed rgba(212,168,41,.55);animation:spin 2.4s linear infinite}
-.scan-sym{position:absolute;left:44px;top:40px;font-size:1.7rem;color:#e8d060;text-shadow:0 0 22px rgba(232,208,96,.5)}
+.scan-sym{width:56px;height:56px;flex:none;display:flex;align-items:center;justify-content:center;font-size:2.6rem;line-height:1;color:#e8d060;text-shadow:0 0 22px rgba(232,208,96,.5);animation:spin 1.6s linear infinite}
 .scan-title{font-family:'Orbitron',sans-serif;font-size:.82rem;letter-spacing:.16em;color:var(--amber);text-transform:uppercase}
 .scan-elapsed{font-size:.68rem;color:var(--dim);letter-spacing:.14em;margin-top:3px}
 .scan-log{font-size:.74rem;color:#b0a548;line-height:2;min-height:6em}
@@ -805,7 +807,7 @@ td{padding:10px 16px;color:#b0a548}
 <div class="scan-loader" id="scan-loader" role="status" aria-live="polite">
 <div class="scan-box">
 <div class="scan-top">
-<div class="scan-ring"></div><span class="scan-sym">☢</span>
+<span class="scan-sym">☢</span>
 <div>
 <div class="scan-title">Scanning the Archive</div>
 <div class="scan-elapsed" id="scan-elapsed">T+0.0s</div>
