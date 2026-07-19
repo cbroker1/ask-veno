@@ -2,7 +2,7 @@
 
 ## Stalker Gamma PDA — Local YouTube RAG Dashboard
 
-A fully offline, single-file FastAPI dashboard that turns any YouTube channel into a searchable knowledge base — styled as a S.T.A.L.K.E.R. Gamma PDA.
+A fully offline FastAPI dashboard that turns any YouTube channel into a searchable knowledge base — styled as a S.T.A.L.K.E.R. Gamma PDA.
 
 **No cloud APIs. No paid services. Just ChromaDB + Ollama + FastAPI running on your own hardware.**
 
@@ -49,7 +49,7 @@ Full dashboard with the Stalker Gamma PDA aesthetic — amber phosphor glow, CRT
 
 | Layer | Technology |
 |-------|------|
-| Dashboard | FastAPI + Jinja (single file) |
+| Dashboard | FastAPI + custom template engine (modular `app/`, `rag/`, `storage/`, `presentation/` packages) |
 | Vector DB | ChromaDB (persisted) |
 | Embeddings | intfloat/multilingual-e5-large (CPU) |
 | LLM | ollama qwen3:0.6b (CPU) |
@@ -60,6 +60,33 @@ Full dashboard with the Stalker Gamma PDA aesthetic — amber phosphor glow, CRT
 **Hardware:**
 - GPU 0: NVIDIA RTX A6000 (49GB) — Whisper transcription only
 - CPU: AMD Ryzen 9 9950X — embedding model, Ollama inference, web app
+
+---
+
+### ✦ Development architecture
+
+The web application is split into small modules; startup commands, endpoints, and the UI are unchanged.
+
+```
+web_app.py                    Compatibility entrypoint — `python web_app.py` / `uvicorn web_app:app`
+app/
+  config.py                   Env-driven paths, collection, embedder name, fixed Ollama settings
+  main.py                     FastAPI instance + route registration
+  routes.py                   Thin HTTP handlers: /, /search, /api/stats, /api/videos, /api/search
+rag/
+  embeddings.py               Lazy CPU-only E5 model singleton
+  transcript_retriever.py     ChromaDB query + chunk-dictionary mapping
+  generator.py                Ollama availability probe + answer synthesis
+  pipeline.py                 Coordinates retrieval → generation
+storage/
+  archive.py                  Read-only SQLite video stats and records
+presentation/
+  formatters.py               Pure formatting/sanitization helpers
+  template_engine.py          Custom {{placeholder}} renderer + template loading
+  renderer.py                 Server-side HTML construction
+  templates/page.html         The full PDA page (HTML/CSS/JS), moved verbatim
+tests/                        Characterization suite: python -m unittest discover -s tests
+```
 
 ---
 
