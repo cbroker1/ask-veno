@@ -50,9 +50,18 @@ class TestRules(unittest.TestCase):
         self.assertEqual(d.corpus, "gamma")
         self.assertIn("AK-74N", d.reason)
 
-    def test_keywords_without_item_go_gamma(self):
+    def test_mechanic_comparison_goes_gamma(self):
+        # mechanic/stat comparisons are directly answerable from the database
         d = route_with("compare silencer attachments by weight", [])
-        self.assertEqual(d.corpus, "combined")  # 'compare' = recommendation + kw
+        self.assertEqual(d.corpus, "gamma")
+
+    def test_category_recommendation_goes_combined(self):
+        d = route_with("best weapon for killing mutants", [])
+        self.assertEqual(d.corpus, "combined")
+
+    def test_possessive_veno_recognized(self):
+        d = route_with("What was Veno's plan to buy ammo?", [])
+        self.assertEqual(d.corpus, "combined")   # veno + mechanic keywords
 
     def test_pure_mechanic_keywords_go_gamma(self):
         d = route_with("silencer attachment weight", [])

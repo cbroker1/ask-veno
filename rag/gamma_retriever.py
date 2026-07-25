@@ -16,6 +16,7 @@ FTS failure -> dense only.
 
 from __future__ import annotations
 
+import re
 import time
 
 from app.config import (
@@ -37,11 +38,16 @@ _FACET_PRIORITY = ["stats", "overview", "compatibility", "crafting",
                    "disassembly", "obtaining", "upgrades", "parts"]
 
 
+_QUERY_TOKEN_RE = re.compile(r"[0-9a-zа-яё]+(?:[.\-][0-9a-zа-яё]+)*")
+
+
 def _query_variants(query: str, max_n: int = 6) -> list[tuple[str, str]]:
     """Deterministic (norm, compact) candidate fragments: the whole query
-    plus every contiguous token n-gram, longest first."""
+    plus every contiguous token n-gram, longest first. Tokens are stripped of
+    surrounding punctuation ("SVD?" -> "svd") while inner dots/hyphens stay
+    ("ak-74", "5.45x39")."""
     norm = norm_name(query)
-    tokens = norm.split()
+    tokens = _QUERY_TOKEN_RE.findall(norm)
     variants: list[tuple[str, str]] = []
     seen: set[str] = set()
 
@@ -67,9 +73,11 @@ def resolve_exact_items(db: GammaDB, query: str,
     variants = _query_variants(query)
     hits = db.lookup_exact(variants, limit=limit * 4)
     if not hits:
-        # prefix fallback: most specific fragments first, ≥4 compact chars
+        # Prefix fallback exists to catch model numbers ("AK-74" -> AK-74N,
+        # "tak-7" -> TAK-74), so it only fires on digit-bearing fragments —
+        # plain words like "join" or "ammo" must never prefix-match item ids.
         for _, compact in variants:
-            if len(compact) < 4:
+            if len(compact) < 4 or not any(ch.isdigit() for ch in compact):
                 continue
             hits = db.lookup_prefix(compact, limit=limit * 4)
             if hits:
@@ -153,9 +161,11 @@ def retrieve(query: str, top_k: int = FINAL_EVIDENCE_K, *,
         protected = _exact_facet_evidence(db, exact_items, query)
         t_exact = time.perf_counter()
 
-        bm25_rows = db.fts_search(build_match_query(query), limit=bm25_k)
+        bm25_rows = (db.fts_search(build_match_query(query), limit=bm25_k)
+                     if bm25_k > 0 else [])
         t_bm25 = time.perf_counter()
-        dense_rows = _dense_search(db, query, dense_k, debug)
+        dense_rows = (_dense_search(db, query, dense_k, debug)
+                      if dense_k > 0 else [])
         t_dense = time.perf_counter()
 
         fused = rrf_fuse([[r["facet_id"] for r in dense_rows],

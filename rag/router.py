@@ -29,29 +29,34 @@ VENO_TERMS = {
     "prefer", "prefers", "favorite", "favourite", "reacted", "reaction",
     "happened", "watch", "watched",
 }
-# Strong personal markers that only count together with a weaker one would be
-# overkill here: the list above is deliberately explicit-only ("uses" alone is
-# NOT a Veno signal — "what ammo does the AK-74 use" is a database question).
+# The list is deliberately explicit-only ("uses" alone is NOT a Veno signal —
+# "what ammo does the AK-74 use" is a database question).
 
-# Game-mechanic / item-data vocabulary (stats, systems, and item categories).
-GAMMA_TERMS = {
-    "stats", "stat", "weight", "ammo", "ammunition", "caliber", "calibre",
-    "magazine", "magazines", "capacity", "damage", "penetration", "accuracy",
-    "recoil", "handling", "reliability", "durability", "repair", "craft",
-    "crafting", "recipe", "recipes", "disassemble", "disassembly", "upgrade",
-    "upgrades", "attachment", "attachments", "scope", "scopes", "silencer",
-    "silencers", "suppressor", "drop", "drops", "loadout", "loadouts",
-    "item", "items", "price", "cost", "trader", "traders", "sell", "sells",
-    "buy", "stash", "stashes", "protection", "artefact", "artefacts",
-    "artifact", "artifacts", "rifle", "rifles", "pistol", "pistols",
-    "shotgun", "shotguns", "smg", "smgs", "sniper", "snipers", "outfit",
-    "outfits", "helmet", "helmets", "exoskeleton", "detector", "detectors",
-    "medkit", "bandage", "rounds",
+# Mechanic/stat/system vocabulary: questions the database answers directly.
+GAMMA_MECHANIC_TERMS = {
+    "stats", "stat", "weight", "ammo", "ammunition", "cartridge",
+    "cartridges", "caliber", "calibre", "magazine", "magazines", "capacity",
+    "damage", "penetration", "accuracy", "recoil", "handling", "reliability",
+    "durability", "repair", "craft", "crafting", "recipe", "recipes",
+    "disassemble", "disassembly", "upgrade", "upgrades", "attachment",
+    "attachments", "scope", "scopes", "silencer", "silencers", "suppressor",
+    "drop", "drops", "loadout", "loadouts", "price", "cost", "trader",
+    "traders", "sell", "sells", "buy", "stash", "stashes", "protection",
+    "rounds", "gamma",
+}
+# Item-category nouns: game-data flavored, but common in stream talk too —
+# they only pull toward GAMMA without an explicit Veno signal.
+GAMMA_CATEGORY_TERMS = {
+    "item", "items", "weapon", "weapons", "rifle", "rifles", "pistol",
+    "pistols", "shotgun", "shotguns", "smg", "smgs", "sniper", "snipers",
+    "outfit", "outfits", "helmet", "helmets", "exoskeleton", "detector",
+    "detectors", "artefact", "artefacts", "artifact", "artifacts", "medkit",
+    "bandage",
 }
 RECOMMEND_TERMS = {"best", "better", "worth", "should", "good", "recommend",
                    "recommended", "vs", "versus", "compare", "comparison"}
 
-_WORD_RE = re.compile(r"[0-9a-zA-Z]+(?:[-.'][0-9a-zA-Z]+)*")
+_WORD_RE = re.compile(r"[0-9a-zA-Z]+(?:[-.][0-9a-zA-Z]+)*")
 
 
 @dataclass
@@ -82,30 +87,44 @@ def _exact_items(query: str, db_path=None) -> list[dict]:
 
 def route(query: str, db_path=None) -> RouteDecision:
     toks = _tokens(query)
-    # split hyphenated tokens too so "AK-74" contributes "ak" and "74"
     veno = sorted({t for t in toks if t in VENO_TERMS})
-    gamma = sorted({t for t in toks if t in GAMMA_TERMS})
+    mech = sorted({t for t in toks if t in GAMMA_MECHANIC_TERMS})
+    cat = sorted({t for t in toks if t in GAMMA_CATEGORY_TERMS})
     recommend = sorted({t for t in toks if t in RECOMMEND_TERMS})
+    gamma_terms = sorted(set(mech) | set(cat))
 
-    if veno and gamma:
-        exact = _exact_items(query, db_path)
-        return RouteDecision("combined",
-                             "Venoxium intent plus GAMMA mechanic keywords",
-                             veno, gamma, recommend, exact)
     if veno:
+        if mech:
+            return RouteDecision("combined",
+                                 "Venoxium intent plus GAMMA mechanic keywords",
+                                 veno, gamma_terms, recommend,
+                                 _exact_items(query, db_path))
+        if recommend and cat:
+            return RouteDecision("combined",
+                                 "Venoxium intent plus item recommendation",
+                                 veno, gamma_terms, recommend,
+                                 _exact_items(query, db_path))
         return RouteDecision("transcripts", "explicit Venoxium intent",
-                             veno, gamma, recommend, [])
+                             veno, gamma_terms, recommend, [])
 
     exact = _exact_items(query, db_path)
-    if recommend and (gamma or exact):
-        return RouteDecision("combined",
-                             "recommendation phrasing over game items — both corpora",
-                             veno, gamma, recommend, exact)
     if exact:
+        if recommend:
+            return RouteDecision("combined",
+                                 "recommendation phrasing over a named item — both corpora",
+                                 veno, gamma_terms, recommend, exact)
         return RouteDecision("gamma", "query names a GAMMA item "
-                             f"({exact[0]['name']})", veno, gamma, recommend, exact)
-    if gamma:
+                             f"({exact[0]['name']})", veno, gamma_terms,
+                             recommend, exact)
+    if mech:
         return RouteDecision("gamma", "GAMMA mechanic/stat keywords",
-                             veno, gamma, recommend, [])
+                             veno, gamma_terms, recommend, [])
+    if recommend and cat:
+        return RouteDecision("combined",
+                             "recommendation over an item category — both corpora",
+                             veno, gamma_terms, recommend, [])
+    if cat:
+        return RouteDecision("gamma", "GAMMA item-category keywords",
+                             veno, gamma_terms, recommend, [])
     return RouteDecision("transcripts", "no strong signals — default archive",
-                         veno, gamma, recommend, [])
+                         veno, gamma_terms, recommend, [])
