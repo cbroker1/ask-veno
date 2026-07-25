@@ -145,8 +145,22 @@ class TestMissingChromaPath(unittest.TestCase):
 
 
 class TestPipeline(unittest.TestCase):
+    """Characterization of the auto->transcripts flow. Phase 2 added fields
+    to the response, so these assert the legacy chunks/summary contract as a
+    subset; routing and corrective retries are pinned off/hermetic."""
+
     CHUNKS = [{"id": "c1", "s": "0:01", "e": "0:02", "vt": "T", "vid": "v", "txt": "x",
                "distance": 0.3, "sim_pct": 70.0, "url": "u"}]
+
+    def setUp(self):
+        from rag.router import RouteDecision
+        route_patch = patch.object(pipeline.router, "route",
+                                   return_value=RouteDecision("transcripts", "test"))
+        route_patch.start()
+        self.addCleanup(route_patch.stop)
+        corrective_patch = patch.object(pipeline, "CORRECTIVE_RAG_ENABLED", False)
+        corrective_patch.start()
+        self.addCleanup(corrective_patch.stop)
 
     def test_summary_generated_when_chunks_and_ollama(self):
         with patch("rag.pipeline.retrieve_chunks", return_value=self.CHUNKS) as ret, \
@@ -156,7 +170,9 @@ class TestPipeline(unittest.TestCase):
             result = pipeline.search("q", top_k=3)
         ret.assert_called_once_with("q", 3)
         llm.assert_called_once_with("q", self.CHUNKS)
-        self.assertEqual(result, {"chunks": self.CHUNKS, "summary": "ANSWER"})
+        self.assertEqual(result["chunks"], self.CHUNKS)
+        self.assertEqual(result["summary"], "ANSWER")
+        self.assertEqual(result["route"], "transcripts")
 
     def test_generation_failure_falls_back_to_empty_summary(self):
         with patch("rag.pipeline.retrieve_chunks", return_value=self.CHUNKS), \
@@ -164,7 +180,8 @@ class TestPipeline(unittest.TestCase):
              patch.object(pipeline.generator, "llm_answer",
                           Mock(side_effect=RuntimeError("boom"))):
             result = pipeline.search("q")
-        self.assertEqual(result, {"chunks": self.CHUNKS, "summary": ""})
+        self.assertEqual(result["chunks"], self.CHUNKS)
+        self.assertEqual(result["summary"], "")
 
     def test_no_chunks_skips_generation(self):
         with patch("rag.pipeline.retrieve_chunks", return_value=[]), \
@@ -172,7 +189,8 @@ class TestPipeline(unittest.TestCase):
              patch.object(pipeline.generator, "llm_answer", Mock()) as llm:
             result = pipeline.search("q")
         llm.assert_not_called()
-        self.assertEqual(result, {"chunks": [], "summary": ""})
+        self.assertEqual(result["chunks"], [])
+        self.assertEqual(result["summary"], "")
 
     def test_ollama_offline_skips_generation(self):
         with patch("rag.pipeline.retrieve_chunks", return_value=self.CHUNKS), \
@@ -180,7 +198,20 @@ class TestPipeline(unittest.TestCase):
              patch.object(pipeline.generator, "llm_answer", Mock()) as llm:
             result = pipeline.search("q")
         llm.assert_not_called()
-        self.assertEqual(result, {"chunks": self.CHUNKS, "summary": ""})
+        self.assertEqual(result["chunks"], self.CHUNKS)
+        self.assertEqual(result["summary"], "")
+
+    def test_manual_transcripts_mode_returns_legacy_contract(self):
+        with patch("rag.pipeline.retrieve_chunks", return_value=self.CHUNKS) as ret, \
+             patch.object(pipeline.generator, "OLLAMA_AVAILABLE", True), \
+             patch.object(pipeline.generator, "llm_answer",
+                          Mock(return_value="ANSWER")):
+            result = pipeline.search("q", 3, corpus="transcripts")
+        ret.assert_called_once_with("q", 3)
+        self.assertEqual(result["chunks"], self.CHUNKS)
+        self.assertEqual(result["summary"], "ANSWER")
+        self.assertEqual(result["route"], "transcripts")
+        self.assertFalse(result["rewritten"])
 
 
 if __name__ == "__main__":

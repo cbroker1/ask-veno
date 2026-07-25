@@ -26,17 +26,17 @@ async def dashboard(request: Request):
 
 
 @router.post("/search", response_class=HTMLResponse)
-async def search(request: Request, query: str = Form(...)):
+async def search(request: Request, query: str = Form(...), corpus: str = Form("auto")):
     query = (query or "").strip()
     if not query:
         return HTMLResponse(content=render_page(synth_online=generator.OLLAMA_AVAILABLE))
     error_msg = ""
     t0 = time.perf_counter()
     try:
-        search_res = pipeline.search(query, 5)
+        search_res = pipeline.search(query, 5, corpus=corpus)
     except Exception as e:
         search_res = {"chunks": [], "summary": ""}
-        error_msg = str(e)
+        error_msg = getattr(e, "detail", None) or str(e)
         print(f"Search error: {e}")
     scan_s = time.perf_counter() - t0
     return HTMLResponse(content=render_page(
@@ -47,6 +47,10 @@ async def search(request: Request, query: str = Form(...)):
         scan_s=scan_s,
         searched=True,
         synth_online=generator.OLLAMA_AVAILABLE,
+        corpus=corpus,
+        route=search_res.get("route", ""),
+        route_reason=search_res.get("route_reason", ""),
+        evidence=search_res.get("evidence", []),
     ))
 
 
@@ -59,5 +63,6 @@ async def api_videos(limit: int = 20): return get_videos(limit)
 
 
 @router.post("/api/search")
-async def api_search(query: str = Form(...), top_k: int = Form(5)):
-    return pipeline.search(query, top_k=top_k)
+async def api_search(query: str = Form(...), top_k: int = Form(5),
+                     corpus: str = Form("auto")):
+    return pipeline.search(query, top_k=top_k, corpus=corpus)

@@ -43,3 +43,46 @@ def retrieve_chunks(query, top_k=5):
                     "url": md.get("youtube_time_url","N/A"),
                     "txt": docs[0][i][:1200]})
     return raw_chunks
+
+
+def _lexical_row_to_chunk(row: dict) -> dict:
+    """Map a lexical-index row into the legacy chunk shape. BM25-only hits
+    have no dense distance, so distance is None and sim_pct 0 (the existing
+    convention for unknown similarity)."""
+    return {"id": row["chunk_id"], "distance": None, "sim_pct": 0,
+            "vt": (row.get("video_title") or "Unknown")[:100],
+            "vid": row.get("video_id") or "Unknown",
+            "s": row.get("start_hms") or "N/A",
+            "e": row.get("end_hms") or "N/A",
+            "url": row.get("url") or "N/A",
+            "txt": (row.get("text") or "")[:1200]}
+
+
+def retrieve_chunks_hybrid(query, top_k=5, dense_k=20, bm25_k=20):
+    """Hybrid transcript retrieval: dense + BM25 fused with RRF.
+
+    Used by combined/adaptive modes only — the plain retrieve_chunks() dense
+    path above stays byte-identical for corpus="transcripts". Falls back to
+    dense-only when the lexical index is missing or the FTS query fails.
+    """
+    from rag.fusion import build_match_query, rrf_fuse
+    from storage.lexical import LexicalDB, LexicalUnavailable
+
+    dense = retrieve_chunks(query, dense_k)
+    try:
+        lex = LexicalDB()
+        try:
+            lex_rows = lex.fts_search(build_match_query(query), limit=bm25_k)
+        finally:
+            lex.close()
+    except LexicalUnavailable:
+        lex_rows = []
+    if not lex_rows:
+        return dense[:top_k]
+
+    by_id = {c["id"]: c for c in dense}
+    for row in lex_rows:
+        by_id.setdefault(row["chunk_id"], _lexical_row_to_chunk(row))
+    fused = rrf_fuse([[c["id"] for c in dense],
+                      [r["chunk_id"] for r in lex_rows]])
+    return [by_id[cid] for cid, _ in fused[:top_k] if cid in by_id]

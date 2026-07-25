@@ -72,7 +72,7 @@ class RouteSmokeTests(unittest.TestCase):
         fake = {"chunks": FAKE_CHUNKS, "summary": "A direct answer."}
         with patch("rag.pipeline.search", return_value=fake) as mock_search:
             r = self.client.post("/search", data={"query": "best weapon"})
-        mock_search.assert_called_once_with("best weapon", 5)
+        mock_search.assert_called_once_with("best weapon", 5, corpus="auto")
         self.assertEqual(r.status_code, 200)
         self.assertIn("STREAM EVIDENCE", r.text)
         self.assertIn("FIELD REPORT", r.text)
@@ -90,7 +90,7 @@ class RouteSmokeTests(unittest.TestCase):
         fake = {"chunks": FAKE_CHUNKS, "summary": "s"}
         with patch("rag.pipeline.search", return_value=fake) as mock_search:
             r = self.client.post("/api/search", data={"query": "q", "top_k": "3"})
-        mock_search.assert_called_once_with("q", top_k=3)
+        mock_search.assert_called_once_with("q", top_k=3, corpus="auto")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json(), fake)
 
@@ -98,8 +98,21 @@ class RouteSmokeTests(unittest.TestCase):
         fake = {"chunks": [], "summary": ""}
         with patch("rag.pipeline.search", return_value=fake) as mock_search:
             r = self.client.post("/api/search", data={"query": "q"})
-        mock_search.assert_called_once_with("q", top_k=5)
+        mock_search.assert_called_once_with("q", top_k=5, corpus="auto")
         self.assertEqual(r.status_code, 200)
+
+    def test_api_search_passes_corpus(self):
+        fake = {"chunks": [], "summary": ""}
+        with patch("rag.pipeline.search", return_value=fake) as mock_search:
+            r = self.client.post("/api/search",
+                                 data={"query": "q", "corpus": "gamma"})
+        mock_search.assert_called_once_with("q", top_k=5, corpus="gamma")
+        self.assertEqual(r.status_code, 200)
+
+    def test_search_form_has_corpus_selector(self):
+        r = self.client.get("/")
+        self.assertIn('name="corpus"', r.text)
+        self.assertIn('value="auto" checked', r.text.replace("'", '"'))
 
 
 if __name__ == "__main__":

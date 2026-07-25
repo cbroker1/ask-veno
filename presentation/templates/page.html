@@ -84,6 +84,27 @@ body::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;border:2p
 #recent-row{display:none}
 #recent-row.has-items{display:flex}
 
+/* ── corpus selector ── */
+.sf-col{flex-direction:column;gap:10px}
+.sf-row{display:flex;gap:8px;width:100%}
+.corpus-row{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.corpus-chip{position:relative;display:inline-flex}
+.corpus-chip input{position:absolute;opacity:0;pointer-events:none}
+.corpus-chip span{font-family:'Share Tech Mono',monospace;font-size:.7rem;letter-spacing:.08em;color:#8a7e3a;background:#0c0a05;border:1px solid var(--line2);border-radius:2px;padding:5px 12px;cursor:pointer;transition:all .15s;text-transform:uppercase}
+.corpus-chip span:hover{border-color:var(--amber);color:var(--amber-hi)}
+.corpus-chip input:checked+span{color:#0a0a08;background:var(--amber);border-color:var(--amber);text-shadow:none;font-weight:bold}
+.corpus-chip input:focus-visible+span{outline:1px solid var(--amber);outline-offset:2px}
+
+/* ── gamma evidence cards ── */
+.gamma-card{border-left:3px solid #3a9ad4;cursor:default}
+.gamma-card:hover{border-left-color:#6ec1ef;border-color:#1e3a50;background:linear-gradient(160deg,#0e1420,#0a0f18)}
+.g-tag{font-family:'Orbitron',sans-serif;font-size:.6rem;letter-spacing:.12em;color:#6ec1ef;border:1px solid #1e3a50;border-radius:2px;padding:2px 7px;background:#0a1520}
+.g-exact{font-family:'Orbitron',sans-serif;font-size:.6rem;letter-spacing:.12em;color:var(--green);border:1px solid var(--green-dim);border-radius:2px;padding:2px 7px;background:#0a1e0a}
+.g-facet{font-size:.62rem;color:var(--dim);letter-spacing:.14em}
+.g-prov{margin-top:10px;font-size:.6rem;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;word-break:break-all}
+.gamma-card .result-title{color:#8fc7e8}
+.route-badge{font-family:'Orbitron',sans-serif;font-size:.6rem;letter-spacing:.12em;color:#6ec1ef;border:1px solid #1e3a50;border-radius:2px;padding:3px 8px;background:#0a1520;white-space:nowrap}
+
 /* ── echo bar ── */
 .echo-bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px 16px;margin-bottom:18px;border:1px solid var(--line2);border-left:3px solid var(--amber);border-radius:3px;background:#0d0b06;font-size:.74rem}
 .echo-q{color:var(--dim);letter-spacing:.08em}
@@ -224,6 +245,7 @@ td{padding:10px 16px;color:#b0a548}
   #zone-clock{display:none}
   .gauges{grid-template-columns:repeat(2,1fr)}
   .sf{flex-direction:column}
+  .sf-row{flex-direction:column}
   .sbtn{width:100%}
   .echo-meta{margin-left:0}
   .filter-wrap{margin-left:0;width:100%}
@@ -261,7 +283,8 @@ td{padding:10px 16px;color:#b0a548}
 <h2>⌁ Transmit Query to Archive</h2>
 <span class="console-hint">semantic scan · {{total}} streams · {{chunks_fmt}} transcript segments · citations with timestamps</span>
 </div>
-<form class="sf" method="post" action="/search" id="search-form">
+<form class="sf sf-col" method="post" action="/search" id="search-form">
+<div class="sf-row">
 <div class="si-wrap">
 <span class="si-prompt">&gt;</span>
 <input class="si" type="text" name="query" id="search-input" value="{{q_attr}}"
@@ -269,6 +292,8 @@ td{padding:10px 16px;color:#b0a548}
        autocomplete="off" spellcheck="false" required maxlength="300">
 </div>
 <button class="sbtn" type="submit" id="scan-btn">⌈ SCAN ▰</button>
+</div>
+{{corpus_selector}}
 </form>
 <div class="chips" id="example-row">
 <span class="chips-label">TRY ▸</span>
@@ -286,6 +311,7 @@ td{padding:10px 16px;color:#b0a548}
 
 {{echo_html}}
 {{report_html}}
+{{gamma_results_html}}
 {{results_html}}
 
 <section class="telemetry">
