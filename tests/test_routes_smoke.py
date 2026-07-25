@@ -114,6 +114,27 @@ class RouteSmokeTests(unittest.TestCase):
         self.assertIn('name="corpus"', r.text)
         self.assertIn('value="auto" checked', r.text.replace("'", '"'))
 
+    def test_literal_backslash_n_never_reaches_the_page(self):
+        chunk = dict(FAKE_CHUNKS[0], txt="first line\\nsecond line")
+        gamma_ev = {"id": "gamma095:wpn_x:overview", "corpus": "gamma",
+                    "source_type": "gamma_exact", "title": "X",
+                    "text": "X — GAMMA 0.9.5.\\nEngine-markup description line.",
+                    "score": 1.0, "url": None,
+                    "metadata": {"item_id": "wpn_x", "category": "Rifles",
+                                 "facet_type": "overview"}}
+        fake = {"chunks": [chunk], "summary": "ans one\\nans two",
+                "evidence": [gamma_ev], "route": "combined",
+                "route_reason": "test"}
+        with patch("rag.pipeline.search", return_value=fake):
+            r = self.client.post("/search", data={"query": "anything"})
+        self.assertEqual(r.status_code, 200)
+        # every literal backslash-n was converted to a <br>
+        self.assertIn("first line<br>second line", r.text)
+        self.assertIn("GAMMA 0.9.5.<br>Engine-markup description line", r.text)
+        self.assertIn("ans one<br>ans two", r.text)
+        self.assertNotIn("first line\\nsecond line", r.text)
+        self.assertNotIn("ans one\\nans two", r.text)
+
 
 if __name__ == "__main__":
     unittest.main()

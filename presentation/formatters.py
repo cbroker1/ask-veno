@@ -55,11 +55,18 @@ def _ring(count, total) -> str:
 _THINK_RE = re.compile(r"<think>.*?</think>", re.S | re.I)
 
 
+def text_to_html(text: Any) -> str:
+    """Escape text for HTML and turn line breaks into <br> — both real
+    newlines and LITERAL backslash-n sequences (X-Ray engine markup that can
+    reach us via game descriptions or an LLM echoing them)."""
+    return esc(text).replace("\\n", "<br>").replace("\n", "<br>")
+
+
 def _clean_summary(text: str) -> str:
     """Display-side cleanup of the local LLM output: drop stray think-tags,
     escape, and preserve line breaks."""
     text = _THINK_RE.sub("", text or "").strip()
-    return esc(text).replace("\n", "<br>")
+    return text_to_html(text)
 
 
 def _clean_vid(vid: str | None) -> str:

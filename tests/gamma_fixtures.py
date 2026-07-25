@@ -97,7 +97,9 @@ def fixture_files() -> dict[str, object]:
     translations = {
         "locales": ["en", "ru"],
         "en": {
-            "st_wpn_tak": "TAK-74", "st_wpn_tak_descr": "A dependable test rifle.",
+            "st_wpn_tak": "TAK-74",
+            # literal backslash-n, exactly as the upstream export carries it
+            "st_wpn_tak_descr": "A dependable test rifle.\\nTrusted in the Zone.",
             "ammo-5.45x39-test": "5.45x39mm Test FMJ",
             "ammo-5.45x39-test_descr": "Test cartridge.",
             "ammo-5.45x39-alt": "5.45x39mm Test AP",

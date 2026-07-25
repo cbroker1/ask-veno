@@ -64,6 +64,20 @@ def content_hash(obj) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
+def clean_game_text(text: str | None) -> str | None:
+    """Normalize X-Ray engine string markup in translated text.
+
+    Upstream translation values carry LITERAL backslash-n sequences (the
+    engine's line-break directive, preserved verbatim by the JSON export —
+    1,559 EN strings at the inspected commit). Convert them to real newlines
+    so facets, prompts, and the UI never show a raw "\\n". No other engine
+    markup (e.g. %c color codes) exists in the 0.9.5 export.
+    """
+    if text is None:
+        return None
+    return text.replace("\\n", "\n")
+
+
 class Translator:
     """Deterministic translation-key resolution with safe fallback.
 
@@ -82,7 +96,7 @@ class Translator:
             return None
         text = self._en.get(key)
         if text is not None:
-            return text
+            return clean_game_text(text)
         self.missing_keys.add(key)
         return key
 
@@ -95,12 +109,12 @@ class Translator:
         text = self._en.get(key)
         if text is None:
             self.missing_keys.add(key)
-        return text
+        return clean_game_text(text)
 
     def resolve_ru(self, key: str | None) -> str | None:
         if not key:
             return None
-        return self._ru.get(key)
+        return clean_game_text(self._ru.get(key))
 
     def has(self, key: str) -> bool:
         return key in self._en

@@ -17,6 +17,7 @@ from presentation.formatters import (
     esc,
     fmt_n,
     hms_to_seconds,
+    text_to_html,
 )
 from presentation.template_engine import PAGE, tmpl
 from storage.archive import get_video_stats, get_videos
@@ -108,7 +109,7 @@ def _gamma_results(gamma_evidence: list, combined: bool) -> str:
         exact_badge = '<span class="g-exact">EXACT MATCH</span>' if exact else ""
         sim = md.get("sim_pct")
         sim_txt = f'<span class="sig-text">{sim}% SIGNAL</span><span class="sep">│</span>' if sim else ""
-        text = esc(e.get("text") or "").replace("\n", "<br>")
+        text = text_to_html(e.get("text") or "")
         srcs = esc(str(md.get("source_files") or "")).replace("[", "").replace("]", "").replace('&quot;', "")
         h += f'''<article class="result-card gamma-card" id="gev-{i}" tabindex="0">
 <div class="ev-head"><span class="ev-idx">[G{i:02d}]</span><span class="g-tag">GAMMA 0.9.5</span>{exact_badge}{sim_txt}<span class="g-facet">{facet.upper()}</span>
@@ -137,7 +138,7 @@ def _results(chunks, searched: bool, combined: bool = False,
          f'<span class="sec-sub">{len(chunks)} MATCHED SEGMENT{"S" if len(chunks) != 1 else ""} — click a card to play the clip at its timestamp</span></h2>'
          '<div class="results-list">')
     for i, c in enumerate(chunks, 1):
-        text = esc(c["txt"]).replace("\n", "<br>")
+        text = text_to_html(c["txt"])
         sp = c.get("sim_pct") or 0
         vid = _clean_vid(c.get("vid"))
         seconds = hms_to_seconds(c.get("s"))

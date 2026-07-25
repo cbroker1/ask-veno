@@ -76,7 +76,10 @@ class TestBuilder(unittest.TestCase):
     def test_names_descriptions_prices_resolved(self):
         tak = self.items["wpn_tak"]
         self.assertEqual(tak.name, "TAK-74")
-        self.assertEqual(tak.description, "A dependable test rifle.")
+        # upstream literal backslash-n markup becomes a real newline
+        self.assertEqual(tak.description,
+                         "A dependable test rifle.\nTrusted in the Zone.")
+        self.assertNotIn("\\n", tak.description)
         self.assertEqual(tak.price, 26950)
         self.assertEqual(tak.display_variant, "TAK-74 [74]")
         self.assertEqual(tak.category, "Rifles")
