@@ -48,25 +48,32 @@ Full dashboard with the Stalker Gamma PDA aesthetic — amber phosphor glow, CRT
 ### ✦ Architecture
 
 ```
-┌─────────────────┐      ┌──────────────┐     ┌───────────────┐      ┌──────────────┐
-│                 │      │              │     │               │      │              │
-│  FastAPI UI     │────▶│ ChromaDB     │────▶│ multilingual- │────▶│  Ollama      │
-│  (Stalker PDA   │      │ youtube_     │     │ e5-large      │      │  qwen3:0.6b  │
-│   "Gamma"       │      │ chunks       │     │ embeddings    │      │  (on CPU)    │
-│   Theme)        │      │ (257 videos, │     │ (on CPU)      │      │              │
-│                 │      │  21,959      │     │               │      │              │
-└─────────────────┘      │  chunks)     │     └───────────────┘      └──────────────┘
-                         └──────────────┘
+┌─────────────────┐     ┌────────────────────────┐     ┌───────────────┐     ┌──────────────┐
+│                 │     │ ChromaDB               │     │               │     │              │
+│  FastAPI UI     │────▶│  youtube_chunks        │────▶│ multilingual- │────▶│  Ollama      │
+│  (Stalker PDA   │     │  (299 videos, 28,692   │     │ e5-large      │     │  qwen3:0.6b  │
+│   "Gamma"       │     │   chunks)              │     │ embeddings    │     │  (on CPU)    │
+│   Theme)        │     │  gamma_items_095_*     │     │ (on CPU)      │     │              │
+│                 │     │  (1,786 items, 7,362   │     └───────────────┘     └──────────────┘
+└─────────────────┘     │   facets)              │
+        │               └────────────────────────┘
+        │               ┌────────────────────────┐
+        └──────────────▶│ SQLite                 │  exact item/alias lookup,
+                        │  gamma_095.sqlite      │  structured facts, and
+                        │  lexical_search.sqlite │  BM25 (FTS5) retrieval
+                        └────────────────────────┘
 ```
 
 | Layer | Technology |
 |-------|------|
-| Dashboard | FastAPI + custom template engine (modular `app/`, `rag/`, `storage/`, `presentation/` packages) |
-| Vector DB | ChromaDB (persisted) |
+| Dashboard | FastAPI + custom template engine (modular `app/`, `rag/`, `storage/`, `indexing/`, `presentation/` packages) |
+| Vector DB | ChromaDB (persisted; separate transcript + versioned GAMMA collections) |
+| Structured DB | SQLite — canonical GAMMA 0.9.5 items/aliases/relations + FTS5 BM25 indexes |
+| Retrieval | exact alias lookup → dense (E5) + BM25 → Reciprocal Rank Fusion → optional cross-encoder |
 | Embeddings | intfloat/multilingual-e5-large (CPU) |
-| LLM | ollama qwen3:0.6b (CPU) |
+| LLM | ollama qwen3:0.6b (CPU) — labeled multi-corpus prompting, one corrective retry |
 | Audio | yt-dlp + Whisper (CUDA on GPU 0 — RTX A6000) |
-| State | SQLite registry |
+| State | SQLite registries |
 | Deployment | conda env + uvicorn |
 
 **Hardware:**
@@ -173,20 +180,30 @@ conda activate ask-veno
 # Ollama models needed
 ollama pull qwen3:0.6b
 
+# Build the GAMMA 0.9.5 corpus (sparse upstream checkout + canonical DB + embeddings)
+python scripts/sync_gamma_095.py
+python scripts/build_gamma_095.py
+
+# Build the transcript BM25 index (from the existing Chroma docs)
+python scripts/build_lexical_index.py
+
 # Start the dashboard
 python web_app.py
 ```
 
-Then open `http://localhost:9876` in your browser.
+Then open `http://localhost:9876` in your browser. (The app degrades
+gracefully: without the GAMMA corpus it runs transcript-only, exactly as
+before.)
 
 ---
 
 ### ✦ Quick Start
 
 1. **Browse** — The video archive table shows all ingested videos with status, chunk count, duration, and upload date.
-2. **Search** — Type any question in the search bar and hit Enter (or click SCAN).
-3. **Read** — The Gamma Analysis panel above the results gives you a direct, locally-generated answer.
-4. **Deep-link** — Click any result card to expand inline video playback at the exact timestamp where that snippet came from.
+2. **Pick a source** — AUTO (routed for you), VENO (stream archive), GAMMA 0.9.5 (item database), or COMBINED.
+3. **Search** — Type any question in the search bar and hit Enter (or click SCAN).
+4. **Read** — The field report above the results gives you a direct, locally-generated answer that says which facts came from the database and which from the stream.
+5. **Deep-link** — Click any stream-evidence card to expand inline video playback at the exact timestamp; GAMMA cards show the item's canonical record and provenance.
 
 ---
 
@@ -194,6 +211,8 @@ Then open `http://localhost:9876` in your browser.
 
 - **Phosphor glow** — Each text element has a subtle `text-shadow` glow mimicking CRT phosphor excitation
 - **Scanlines** — CSS `linear-gradient` on a pseudo-element overlay creates horizontal scanline effect
+- **Corpus selector** — Radio-chip SOURCE row (AUTO / VENO / GAMMA 0.9.5 / COMBINED) with native keyboard behavior
+- **Dual evidence cards** — amber Veno stream cards with inline playback; blue GAMMA database cards with item, category, facet type, EXACT MATCH badge, and provenance
 - **Progress rings** — Circular SVG/progress elements show pipeline completion at a glance
 - **Interactive cards** — Hover triggers amber glow transition; click expands inline video player
 - **Loading state** — Spinning nuclear ☢ loader during Ollama inference with fade-out on completion
@@ -206,10 +225,14 @@ Then open `http://localhost:9876` in your browser.
 
 | Metric | Value |
 |-------|--------|
-| Videos ingested | 257 |
-| Total chunks | 21,959 |
+| Videos ingested | 299 |
+| Transcript chunks | 28,692 (dense + BM25 indexed) |
+| GAMMA 0.9.5 items | 1,786 (100% of upstream index; 6,880 aliases, 57,768 relations) |
+| GAMMA retrieval facets | 7,362 (dense + BM25 indexed) |
 | Processing status | 100% complete |
 | Anomalies | 0 |
+| Routing accuracy (64-question gold set) | 64/64 |
+| Retrieval p50 (full adaptive pipeline) | ~110 ms |
 | Embedding model | `intfloat/multilingual-e5-large` (CPU) |
 | Inference model | `qwen3:0.6b` (local Ollama, CPU) |
 
