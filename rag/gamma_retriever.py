@@ -93,17 +93,33 @@ def resolve_exact_items(db: GammaDB, query: str,
     return out
 
 
+_STOPWORDS = {
+    "the", "and", "for", "with", "from", "that", "this", "does", "what",
+    "when", "where", "which", "who", "why", "how", "are", "was", "were",
+    "will", "would", "should", "could", "can", "about", "into", "its",
+    "did", "has", "have", "had", "you", "your", "his", "her", "their",
+    "there", "here", "than", "then", "them", "they",
+}
+
+
 def _exact_facet_evidence(db: GammaDB, items: list[dict], query: str) -> list:
     """Protected evidence from exactly-resolved items: their facets ranked by
-    query-token overlap, then by canonical facet priority."""
-    q_tokens = {t for t in norm_name(query).split() if len(t) > 2}
+    content-token overlap (stopword-free, whole tokens) with a bonus when the
+    query names the facet type ("stats", "crafting", …), then by canonical
+    facet priority."""
+    q_tokens = {t for t in _QUERY_TOKEN_RE.findall(norm_name(query))
+                if len(t) > 2 and t not in _STOPWORDS}
     scored = []
     for item in items:
         for facet in db.facets(item["item_id"]):
-            text_l = facet["text"].lower()
-            overlap = sum(1 for t in q_tokens if t in text_l)
-            prio = (_FACET_PRIORITY.index(facet["facet_type"])
-                    if facet["facet_type"] in _FACET_PRIORITY else 99)
+            text_tokens = set(_QUERY_TOKEN_RE.findall(facet["text"].lower()))
+            overlap = len(q_tokens & text_tokens)
+            ftype = facet["facet_type"]
+            if any(t == ftype or ftype.startswith(t) or t.startswith(ftype[:4])
+                   for t in q_tokens):
+                overlap += 3
+            prio = (_FACET_PRIORITY.index(ftype)
+                    if ftype in _FACET_PRIORITY else 99)
             scored.append((-overlap, prio, facet["facet_id"], facet, item))
     scored.sort(key=lambda s: s[:3])
     out = []

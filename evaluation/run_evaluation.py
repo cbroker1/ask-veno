@@ -89,11 +89,14 @@ def _score_gamma(rec: dict, evidence, latency_ms: float) -> dict:
 def eval_gamma_ablation(records: list[dict], k: int) -> dict:
     from rag import gamma_retriever, reranker
     gamma_records = [r for r in records if r["category"] in "ABCD"]
+    def _forced_rerank(query, evidence):
+        return reranker.rerank(query, evidence, force=True)
+
     variants = {
         "dense_only": dict(dense_k=20, bm25_k=0, rerank_fn=None),
         "bm25_only": dict(dense_k=0, bm25_k=20, rerank_fn=None),
         "hybrid": dict(dense_k=20, bm25_k=20, rerank_fn=None),
-        "hybrid_rerank": dict(dense_k=20, bm25_k=20, rerank_fn=reranker.rerank),
+        "hybrid_rerank": dict(dense_k=20, bm25_k=20, rerank_fn=_forced_rerank),
     }
     out: dict = {}
     for name, kw in variants.items():

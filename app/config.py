@@ -61,8 +61,10 @@ HYBRID_BM25_K = 20
 RRF_K = 60
 FINAL_EVIDENCE_K = 6
 
-# Optional cross-encoder reranker (lazy-loaded, CPU).
-RERANKER_ENABLED = os.getenv("RERANKER_ENABLED", "1") not in ("0", "false", "no")
+# Optional cross-encoder reranker (lazy-loaded, CPU). Disabled by default:
+# the Phase 2 evaluation measured no retrieval-quality gain over exact+RRF on
+# the gold set while adding ~220ms p50 — opt in with RERANKER_ENABLED=1.
+RERANKER_ENABLED = os.getenv("RERANKER_ENABLED", "0") not in ("0", "false", "no")
 RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 RERANK_CANDIDATES = 20
 

@@ -131,6 +131,10 @@ def _item_facets(item, props, rel, rel_to, name_of, items_by_id, repair_labels):
 
     # ── stats ───────────────────────────────────────────────────────────
     stat_lines = []
+    # Weight belongs in the statistics document too (a "stats" question must
+    # be answerable without the overview facet); price/repair stay overview-only.
+    if "st_prop_weight" in props:
+        stat_lines.append(f"Weight: {props['st_prop_weight'][1]} kg")
     for prop, (label, text, num, is_pct, unit, source) in props.items():
         if prop in _OVERVIEW_PROPS or prop in _HIDDEN_PROPS or prop == "caliber":
             continue

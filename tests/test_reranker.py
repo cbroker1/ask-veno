@@ -39,6 +39,8 @@ class TestReranker(unittest.TestCase):
         self.assertEqual(out, evs)
 
     def test_reorders_by_score(self):
+        enable = patch.object(reranker, "RERANKER_ENABLED", True)
+        enable.start(); self.addCleanup(enable.stop)
         evs = [ev("a", "x"), ev("b", "y"), ev("c", "z")]
         fake = _FakeCE([0.1, 0.9, 0.5])
         with patch.object(reranker, "_get_model", return_value=fake):
@@ -48,12 +50,16 @@ class TestReranker(unittest.TestCase):
         self.assertIsNotNone(reranker.last_latency_ms)
 
     def test_model_load_failure_falls_back(self):
+        enable = patch.object(reranker, "RERANKER_ENABLED", True)
+        enable.start(); self.addCleanup(enable.stop)
         with patch.object(reranker, "_get_model", return_value=None):
             evs = [ev("a", "x")]
             out = reranker.rerank("q", evs)
         self.assertEqual(out, evs)
 
     def test_predict_failure_falls_back(self):
+        enable = patch.object(reranker, "RERANKER_ENABLED", True)
+        enable.start(); self.addCleanup(enable.stop)
         class Boom:
             def predict(self, pairs):
                 raise RuntimeError("boom")
@@ -63,6 +69,8 @@ class TestReranker(unittest.TestCase):
         self.assertEqual(out, evs)
 
     def test_candidate_set_is_bounded(self):
+        enable = patch.object(reranker, "RERANKER_ENABLED", True)
+        enable.start(); self.addCleanup(enable.stop)
         evs = [ev(f"e{i:03d}", "t") for i in range(50)]
         fake = _FakeCE([1.0] * 50)
         with patch.object(reranker, "_get_model", return_value=fake), \
@@ -75,6 +83,8 @@ class TestReranker(unittest.TestCase):
         self.assertIsNone(reranker._model)
 
     def test_deterministic_tiebreak(self):
+        enable = patch.object(reranker, "RERANKER_ENABLED", True)
+        enable.start(); self.addCleanup(enable.stop)
         evs = [ev("b", "x"), ev("a", "y")]
         fake = _FakeCE([0.5, 0.5])
         with patch.object(reranker, "_get_model", return_value=fake):

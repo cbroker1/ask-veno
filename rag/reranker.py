@@ -33,12 +33,14 @@ def available() -> bool:
     return RERANKER_ENABLED and _get_model() is not None
 
 
-def rerank(query: str, evidence: list, top_n: int | None = None) -> list:
+def rerank(query: str, evidence: list, top_n: int | None = None,
+           force: bool = False) -> list:
     """Reorder Evidence objects by cross-encoder relevance. Returns the input
-    unchanged (fused order) when disabled or on any failure."""
+    unchanged (fused order) when disabled (unless force=True, used by the
+    evaluation ablations) or on any failure."""
     global last_latency_ms
     last_latency_ms = None
-    if not RERANKER_ENABLED or not evidence:
+    if (not RERANKER_ENABLED and not force) or not evidence:
         return evidence
     model = _get_model()
     if model is None:
