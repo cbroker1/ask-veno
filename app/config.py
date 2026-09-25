@@ -37,3 +37,49 @@ def get_db_path() -> Path:
 
 def get_chroma_path() -> Path:
     return Path(os.getenv("CHROMA_PATH", DEFAULT_CHROMA_PATH))
+
+
+# ── GAMMA 0.9.5 corpus (Phase 2) ─────────────────────────────────────────────
+# The pack id is a hard pin: ingestion refuses any other GAMMA version. It is
+# intentionally NOT environment-overridable.
+GAMMA_PACK_ID = "gamma-0.9.5"
+GAMMA_UPSTREAM_URL = "https://github.com/simonwdev/stalker-anomaly-gamma-db"
+GAMMA_UPSTREAM_LICENSE = "AGPL-3.0"
+# Generated dataset tree inside the upstream repository.
+GAMMA_DATA_SUBDIR = f"site/public/data/{GAMMA_PACK_ID}"
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+# Sibling checkout next to the ask-veno repository, never inside it.
+DEFAULT_GAMMA_REPO_PATH = _REPO_ROOT.parent / "stalker-anomaly-gamma-db-upstream"
+DEFAULT_GAMMA_DB_PATH = ".state/gamma_095.sqlite"
+DEFAULT_LEXICAL_DB_PATH = ".state/lexical_search.sqlite"
+GAMMA_CHROMA_COLLECTION_PREFIX = "gamma_items_095_"
+
+# Hybrid retrieval tuning (evaluated defaults; see evaluation/).
+HYBRID_DENSE_K = 20
+HYBRID_BM25_K = 20
+RRF_K = 60
+FINAL_EVIDENCE_K = 6
+
+# Optional cross-encoder reranker (lazy-loaded, CPU). Disabled by default:
+# the Phase 2 evaluation measured no retrieval-quality gain over exact+RRF on
+# the gold set while adding ~220ms p50 — opt in with RERANKER_ENABLED=1.
+RERANKER_ENABLED = os.getenv("RERANKER_ENABLED", "0") not in ("0", "false", "no")
+RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+RERANK_CANDIDATES = 20
+
+# One controlled corrective-RAG retry (rewrite + re-retrieve), never more.
+CORRECTIVE_RAG_ENABLED = True
+CORRECTIVE_MAX_RETRIES = 1
+
+
+def get_gamma_repo_path() -> Path:
+    return Path(os.getenv("GAMMA_REPO_PATH", str(DEFAULT_GAMMA_REPO_PATH)))
+
+
+def get_gamma_db_path() -> Path:
+    return Path(os.getenv("GAMMA_DB_PATH", DEFAULT_GAMMA_DB_PATH))
+
+
+def get_lexical_db_path() -> Path:
+    return Path(os.getenv("LEXICAL_DB_PATH", DEFAULT_LEXICAL_DB_PATH))

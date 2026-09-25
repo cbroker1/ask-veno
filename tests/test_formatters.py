@@ -161,6 +161,24 @@ class TestCleanSummary(unittest.TestCase):
         self.assertEqual(fmt._clean_summary(None), "")
         self.assertEqual(fmt._clean_summary("  padded  "), "padded")
 
+    def test_literal_backslash_n_becomes_break(self):
+        # game descriptions (and LLM answers echoing them) can carry the
+        # two-character sequence backslash+n — never show it to the user
+        self.assertEqual(fmt._clean_summary("line one\\nline two"),
+                         "line one<br>line two")
+
+
+class TestTextToHtml(unittest.TestCase):
+    def test_real_newlines(self):
+        self.assertEqual(fmt.text_to_html("a\nb"), "a<br>b")
+
+    def test_literal_backslash_n(self):
+        self.assertEqual(fmt.text_to_html("a\\nb"), "a<br>b")
+
+    def test_mixed_and_escaped(self):
+        self.assertEqual(fmt.text_to_html("<x>\\n&\ny"),
+                         "&lt;x&gt;<br>&amp;<br>y")
+
 
 class TestCleanVid(unittest.TestCase):
     def test_strips_prefix(self):

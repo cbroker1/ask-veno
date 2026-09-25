@@ -5,13 +5,15 @@ daily_channel_job.py -- Daily YouTube RAG channel job.
 Behavior:
 1. Run exhaustive YouTube discovery.
 2. Detect whether brand-new videos were inserted into SQLite.
-3. If no new videos were found, exit quietly (exit code 0).
-4. If new videos were found, process the full queue:
+3. If new videos were found, process the full queue:
    - download audio
    - Whisper transcription
    - transcript cleanup
    - ChromaDB embedding
    - print final pipeline status
+4. Always finish by syncing the transcript keyword (BM25) index with the
+   ChromaDB collection -- also when nothing new was found or a step failed --
+   so keyword search never falls behind dense search.
 
 This is intended to be run once per day by a systemd user timer.
 
@@ -36,11 +38,12 @@ WHAT IT DOES
 3. Runs discover_audio_candidates.py with exhaustive mode
    (--max-discovery-vectors from DAILY_DISCOVERY_MAX_VIDEOS, default 0 = unlimited).
 4. Queries for new videos discovered since the start time.
-5. If no new videos: exits silently (exit code 0).
-6. If new videos found:
+5. If new videos found:
    - Logs each new video (ID, upload date, title).
    - Runs the full queue pipeline (download, whisper, clean, embed).
    - Prints the final pipeline status.
+6. Runs build_lexical_index.py to sync the BM25 index with ChromaDB
+   (a no-op when the chunk counts already match).
 7. Releases the file lock on exit.
 
 ENVIRONMENT VARIABLES
@@ -50,8 +53,8 @@ ENVIRONMENT VARIABLES
     (discover_audio_candidates.py, process_audio_queue.py, etc.)
 
 EXIT CODES
-    0  No new videos or job completed successfully.
-    1  Discovery failed or a pipeline step failed.
+    0  Job completed successfully (including runs with no new videos).
+    1  Discovery, a pipeline step, or the lexical index sync failed.
 
 SYSTEMD TIMER EXAMPLE
 ---------------------
@@ -159,6 +162,126 @@ def get_new_videos(conn: sqlite3.Connection, start_time: str) -> list[sqlite3.Ro
     )
 
 
+def ingest_new_videos(py: str, start_time: str) -> int:
+    max_discovery = os.getenv("DAILY_DISCOVERY_MAX_VIDEOS", "0")
+
+    conn = connect_db()
+    before_count = count_videos(conn)
+    log(f"Video count before discovery: {before_count}")
+
+    code = run_step(
+        "Exhaustive discovery",
+        [
+            py,
+            "scripts/discover_audio_candidates.py",
+            "--max-discovery-videos",
+            str(max_discovery),
+            "--use-browser-cookies",
+            "false",
+        ],
+    )
+
+    if code != 0:
+        log("Discovery failed. Skipping ingestion.")
+        return code
+
+    conn = connect_db()
+    after_count = count_videos(conn)
+    new_videos = get_new_videos(conn, start_time)
+
+    log(f"Video count after discovery: {after_count}")
+    log(f"New videos discovered this run: {len(new_videos)}")
+
+    if not new_videos:
+        log("No new videos discovered.")
+        return 0
+
+    for row in new_videos:
+        log(f"NEW: {row['video_id']} | {row['upload_date']} | {row['title']}")
+
+    steps = [
+        (
+            "Download queued audio",
+            [
+                py,
+                "scripts/process_audio_queue.py",
+                "--max-new-videos",
+                "999",
+                "--use-browser-cookies",
+                "false",
+            ],
+        ),
+        (
+            "Whisper transcription",
+            [
+                py,
+                "scripts/process_whisper_queue.py",
+                "--max-transcribe-videos",
+                "999",
+            ],
+        ),
+        (
+            "Transcript cleanup",
+            [
+                py,
+                "scripts/process_transcript_queue.py",
+                "--max-clean-videos",
+                "999",
+            ],
+        ),
+        (
+            "ChromaDB embedding",
+            [
+                py,
+                "scripts/process_chromadb_queue.py",
+                "--max-embed-videos",
+                "999",
+            ],
+        ),
+        (
+            "Final pipeline status",
+            [
+                py,
+                "scripts/pipeline_status.py",
+            ],
+        ),
+    ]
+
+    for name, command in steps:
+        code = run_step(name, command)
+        if code != 0:
+            log(f"Stopping after failed step: {name}")
+            return code
+
+    return 0
+
+
+def sync_lexical_index(py: str) -> int:
+    """The BM25 index is rebuilt from the Chroma collection, so it only moves
+    when this runs. Running it after every job -- not only after new
+    embeddings -- lets it catch up after manual re-processing or an earlier
+    failed night; build_lexical_index.py is a no-op when counts already match.
+    """
+    return run_step(
+        "Transcript lexical index sync",
+        [py, "scripts/build_lexical_index.py"],
+    )
+
+
+def run_daily_job() -> int:
+    start_time = utc_now()
+    log(f"Daily job started at {start_time}")
+    log(f"Repo root: {ROOT}")
+
+    py = sys.executable
+    code = ingest_new_videos(py, start_time)
+    lexical_code = sync_lexical_index(py)
+
+    if code == 0 and lexical_code == 0:
+        log("Daily job completed successfully.")
+    return code or lexical_code
+
+
 def main() -> int:
     load_dotenv(dotenv_path=ROOT / ".env")
 
@@ -172,103 +295,7 @@ def main() -> int:
             log("Another daily job is already running. Exiting.")
             return 0
 
-        start_time = utc_now()
-        log(f"Daily job started at {start_time}")
-        log(f"Repo root: {ROOT}")
-
-        py = sys.executable
-        max_discovery = os.getenv("DAILY_DISCOVERY_MAX_VIDEOS", "0")
-
-        conn = connect_db()
-        before_count = count_videos(conn)
-        log(f"Video count before discovery: {before_count}")
-
-        code = run_step(
-            "Exhaustive discovery",
-            [
-                py,
-                "scripts/discover_audio_candidates.py",
-                "--max-discovery-videos",
-                str(max_discovery),
-                "--use-browser-cookies",
-                "false",
-            ],
-        )
-
-        if code != 0:
-            log("Discovery failed. Stopping daily job.")
-            return code
-
-        conn = connect_db()
-        after_count = count_videos(conn)
-        new_videos = get_new_videos(conn, start_time)
-
-        log(f"Video count after discovery: {after_count}")
-        log(f"New videos discovered this run: {len(new_videos)}")
-
-        if not new_videos:
-            log("No new videos discovered. Exiting quietly.")
-            return 0
-
-        for row in new_videos:
-            log(f"NEW: {row['video_id']} | {row['upload_date']} | {row['title']}")
-
-        steps = [
-            (
-                "Download queued audio",
-                [
-                    py,
-                    "scripts/process_audio_queue.py",
-                    "--max-new-videos",
-                    "999",
-                    "--use-browser-cookies",
-                    "false",
-                ],
-            ),
-            (
-                "Whisper transcription",
-                [
-                    py,
-                    "scripts/process_whisper_queue.py",
-                    "--max-transcribe-videos",
-                    "999",
-                ],
-            ),
-            (
-                "Transcript cleanup",
-                [
-                    py,
-                    "scripts/process_transcript_queue.py",
-                    "--max-clean-videos",
-                    "999",
-                ],
-            ),
-            (
-                "ChromaDB embedding",
-                [
-                    py,
-                    "scripts/process_chromadb_queue.py",
-                    "--max-embed-videos",
-                    "999",
-                ],
-            ),
-            (
-                "Final pipeline status",
-                [
-                    py,
-                    "scripts/pipeline_status.py",
-                ],
-            ),
-        ]
-
-        for name, command in steps:
-            code = run_step(name, command)
-            if code != 0:
-                log(f"Stopping after failed step: {name}")
-                return code
-
-        log("Daily job completed successfully.")
-        return 0
+        return run_daily_job()
 
 
 if __name__ == "__main__":
