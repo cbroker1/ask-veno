@@ -147,10 +147,12 @@ python evaluation/run_evaluation.py    # routing + retrieval evaluation against 
 
 ### ✦ Daily maintenance & systemd
 
-`scripts/daily_all_job.py` chains the GAMMA job, the existing YouTube job,
-and the lexical sync. To migrate the existing systemd user timer, edit the
-service unit (e.g. `~/.config/systemd/user/daily-rag.service`) and change
-only the ExecStart line:
+`scripts/daily_channel_job.py` (the YouTube job) ends every run with the
+transcript BM25 sync, even when no new videos were found, so keyword search
+stays in step with the dense index. `scripts/daily_all_job.py` runs the GAMMA
+job first, then the YouTube job. To migrate the existing systemd user timer,
+edit the service unit (e.g. `~/.config/systemd/user/daily-rag.service`) and
+change only the ExecStart line:
 
 ```ini
 # before

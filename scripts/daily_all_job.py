@@ -5,9 +5,9 @@ daily_all_job.py -- All-corpus daily wrapper.
 Runs, in order, each as its own subprocess with its own locking:
 
 1. daily_gamma_job.py     GAMMA 0.9.5 sync + conditional rebuild
-2. daily_channel_job.py   existing YouTube discovery/ingestion (unchanged)
-3. build_lexical_index.py transcript BM25 synchronization (no-op when the
-                          chunk count is unchanged)
+2. daily_channel_job.py   YouTube discovery/ingestion, which always ends with
+                          the transcript BM25 sync (no-op when the chunk
+                          count is unchanged)
 
 A failing GAMMA step does not block the YouTube job (the corpora are
 independent); the exit code reflects the worst step so the timer unit shows
@@ -40,7 +40,6 @@ ROOT = Path(__file__).resolve().parents[1]
 STEPS = [
     ("GAMMA 0.9.5 daily job", ["scripts/daily_gamma_job.py"]),
     ("YouTube channel daily job", ["scripts/daily_channel_job.py"]),
-    ("Transcript lexical index sync", ["scripts/build_lexical_index.py"]),
 ]
 
 
